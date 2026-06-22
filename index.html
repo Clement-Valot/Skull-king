@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Skull King" />
 <meta name="theme-color" content="#051020" />
@@ -14,155 +15,271 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Lato:wght@300;400&display=swap" rel="stylesheet" />
 <style>
-  html,body{margin:0;padding:0;background:#051020;}
-  #root{min-height:100vh;}
+html,body{margin:0;padding:0;background:#051020;font-family:'Cinzel','Georgia',serif;color:#e8d5b0;}
+#root{min-height:100vh;}
+.sk-wave{position:fixed;bottom:0;left:0;width:200%;height:70px;background:rgba(13,33,55,.45);border-radius:50%;animation:skwave 8s linear infinite;z-index:0}
+.sk-wave2{animation-delay:-4s;opacity:.45;bottom:8px}
+@keyframes skwave{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.sk-skull{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:28vw;opacity:.025;z-index:0;pointer-events:none;user-select:none}
+.sk-card{background:rgba(5,16,32,.88);border:1px solid rgba(201,168,76,.3);border-radius:12px;backdrop-filter:blur(10px)}
+.sk-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:50;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto}
+.sk-modal{background:#051020;border:1px solid rgba(201,168,76,.5);border-radius:14px;padding:22px;width:100%;max-width:680px;max-height:88vh;overflow-y:auto;box-sizing:border-box}
+.sk-rdot{width:9px;height:9px;border-radius:50%;background:#c9a84c;opacity:.2;flex-shrink:0;display:inline-block}
+.sk-rdot.done{opacity:1}.sk-rdot.current{opacity:1;box-shadow:0 0 8px #c9a84c}
+input[type=number]::-webkit-inner-spin-button{opacity:.4}
+body{-webkit-tap-highlight-color:transparent;}
+.gold-btn{background:linear-gradient(135deg,#c9a84c,#8b6914);color:#000;border:none;border-radius:8px;padding:10px 20px;font-family:'Cinzel',serif;font-weight:700;cursor:pointer;letter-spacing:.05em;transition:all .2s;font-size:1rem}
+.gold-btn:disabled{background:rgba(139,105,20,.3);color:#666;cursor:not-allowed}
+.ghost-btn{background:transparent;border:1px solid rgba(201,168,76,.4);color:#c9a84c;border-radius:8px;padding:8px 16px;font-family:'Cinzel',serif;cursor:pointer;transition:all .2s;font-size:.9rem}
+.num-input{background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.4);color:#e8d5b0;border-radius:6px;padding:5px 8px;font-family:'Cinzel',serif;font-size:1rem;width:52px;text-align:center;outline:none}
+.text-input{flex:1;background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.4);color:#e8d5b0;border-radius:8px;padding:10px 13px;font-family:'Cinzel',serif;outline:none;font-size:1rem}
+.bonus-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;cursor:pointer;user-select:none;font-family:'Lato',sans-serif;font-size:.7rem;transition:all .15s;border:1px solid rgba(201,168,76,.3);background:transparent;color:#8a7a5a}
+.bonus-chip.active{border-color:#c9a84c;background:rgba(201,168,76,.22);color:#c9a84c}
+.counter-btn{background:rgba(201,168,76,.15);border:1px solid rgba(201,168,76,.3);color:#c9a84c;border-radius:4px;width:22px;height:22px;cursor:pointer;font-weight:700;font-size:1rem;line-height:1;padding:0}
+.suggestion-chip{padding:4px 11px;border-radius:20px;border:1px solid rgba(201,168,76,.3);background:rgba(201,168,76,.06);color:#c9a84c;font-family:'Lato',sans-serif;font-size:.78rem;cursor:pointer;user-select:none}
 </style>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body>
 <div id="root"></div>
-<script type="text/babel" data-presets="react">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script>
+'use strict';
+const e = React.createElement;
 const { useState, useEffect } = React;
 
 const MAX_ROUNDS = 10;
-const STORAGE_KEY_GAME = "skullking_current_game";
-const STORAGE_KEY_PLAYERS = "skullking_known_players";
-const STORAGE_KEY_STATS = "skullking_player_stats";
+const STORAGE_KEY_GAME    = 'skullking_current_game';
+const STORAGE_KEY_PLAYERS = 'skullking_known_players';
+const STORAGE_KEY_STATS   = 'skullking_player_stats';
+
+const SEA_COLORS = ['#e63946','#2a9d8f','#e9c46a','#f4a261','#a8dadc','#457b9d','#6a4c93','#f77f00','#4cc9f0','#80b918'];
+const CAPTURE_BONUSES = [
+  {id:'mermaid_pirate', label:'Sirène ↔ Pirate', points:20},
+  {id:'skull_pirate',   label:'Skull King → Pirate', points:30},
+  {id:'mermaid_skull',  label:'Sirène → Skull King', points:40},
+];
+const CARD14_BONUSES = [
+  {id:'c14_black',  label:'14 Noir',   points:20, color:'#c8c8c8'},
+  {id:'c14_yellow', label:'14 Jaune',  points:10, color:'#e9c46a'},
+  {id:'c14_purple', label:'14 Violet', points:10, color:'#a78bfa'},
+  {id:'c14_red',    label:'14 Rouge',  points:10, color:'#f87171'},
+];
 
 function loadJSON(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch (e) {
-    return fallback;
-  }
+  try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : fallback; }
+  catch(_) { return fallback; }
 }
-
 function saveJSON(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (e) {
-    // storage full or unavailable - silently ignore
-  }
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch(_) {}
 }
-
-function normalizeName(name) {
-  return name.trim().toLowerCase();
-}
-const SEA_COLORS = [
-  "#e63946","#2a9d8f","#e9c46a","#f4a261","#a8dadc",
-  "#457b9d","#6a4c93","#f77f00","#4cc9f0","#80b918"
-];
-
-const CAPTURE_BONUSES = [
-  { id:"mermaid_pirate", label:"Sirène ↔ Pirate", points:20 },
-  { id:"skull_pirate",   label:"Skull King → Pirate", points:30 },
-  { id:"mermaid_skull",  label:"Sirène → Skull King", points:40 },
-];
-
-const CARD14_BONUSES = [
-  { id:"c14_black",  label:"14 Noir",   points:20, color:"#c8c8c8" },
-  { id:"c14_yellow", label:"14 Jaune",  points:10, color:"#e9c46a" },
-  { id:"c14_purple", label:"14 Violet", points:10, color:"#a78bfa" },
-  { id:"c14_red",    label:"14 Rouge",  points:10, color:"#f87171" },
-];
+function norm(name) { return name.trim().toLowerCase(); }
+function emptyEntry() { return {bid:null, tricks:null, bonuses:0, activeCapture:{}, activeCard14:{}}; }
 
 function calcScore(bid, tricks, bonuses, roundNum) {
-  if (bid === 0) {
-    const base = roundNum * 10;
-    return tricks === 0 ? base : -base;
-  }
+  if (bid === 0) { const b = roundNum * 10; return tricks === 0 ? b : -b; }
   if (tricks === bid) return bid * 20 + bonuses;
   return Math.abs(tricks - bid) * -10;
 }
 
-function emptyEntry() {
-  return { bid:null, tricks:null, bonuses:0, activeCapture:{}, activeCard14:{} };
+// ── Tiny helpers ──────────────────────────────────────────────────────────────
+function ScoreVal({v}) {
+  if (v === null || v === undefined) return e('span', {style:{color:'#4a3f2a'}}, '—');
+  return e('span', {style:{color: v>0?'#4ade80':v<0?'#f87171':'#8a7a5a', fontWeight:700}}, (v>0?'+':'')+v);
+}
+function GoldBtn({onClick, disabled, children, style}) {
+  return e('button', {onClick, disabled, className:'gold-btn', style}, children);
+}
+function GhostBtn({onClick, children, style}) {
+  return e('button', {onClick, className:'ghost-btn', style}, children);
 }
 
-function ScoreVal({ v }) {
-  if (v === null || v === undefined) return <span style={{color:"#4a3f2a"}}>—</span>;
-  return <span style={{ color: v > 0 ? "#4ade80" : v < 0 ? "#f87171" : "#8a7a5a", fontWeight:700 }}>
-    {v > 0 ? "+" : ""}{v}
-  </span>;
+// ── Entry card ────────────────────────────────────────────────────────────────
+function EntryCard({pi, entry, entries, setEntries, roundNum, showBid, showTricks, players, phase, totalScore}) {
+  const s = entry.bid !== null && entry.tricks !== null ? calcScore(entry.bid, entry.tricks, entry.bonuses, roundNum) : null;
+
+  function updateEntry(patch) {
+    setEntries(entries.map((en, i) => i === pi ? Object.assign({}, en, patch) : en));
+  }
+  function setBid(val) { updateEntry({bid: Math.max(0, Math.min(roundNum, parseInt(val)||0))}); }
+  function setTricks(val) { updateEntry({tricks: Math.max(0, Math.min(roundNum, parseInt(val)||0))}); }
+  function toggleCapture(b) {
+    const was = !!entry.activeCapture[b.id];
+    const newCapture = Object.assign({}, entry.activeCapture, {[b.id]: !was});
+    updateEntry({activeCapture: newCapture, bonuses: entry.bonuses + (was ? -b.points : b.points)});
+  }
+  function setCard14(b, count) {
+    const prev = entry.activeCard14[b.id] || 0;
+    const newCard14 = Object.assign({}, entry.activeCard14, {[b.id]: count});
+    updateEntry({activeCard14: newCard14, bonuses: entry.bonuses + (count - prev) * b.points});
+  }
+
+  return e('div', {style:{padding:14, marginBottom:10, borderRadius:10, background:'rgba(5,16,32,.88)', border:'1px solid rgba(201,168,76,.28)', borderLeft:'3px solid '+SEA_COLORS[pi%SEA_COLORS.length]}},
+    // Header
+    e('div', {style:{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10}},
+      e('div', {style:{display:'flex', alignItems:'center', gap:8}},
+        e('div', {style:{width:8, height:8, borderRadius:'50%', background:SEA_COLORS[pi%SEA_COLORS.length]}}),
+        e('span', {style:{fontWeight:700, fontFamily:"'Cinzel',serif", color:'#e8d5b0'}}, players[pi])
+      ),
+      phase === 'playing' && e('span', {style:{fontFamily:"'Lato',sans-serif", fontSize:'.78rem', color:'#8a7a5a'}},
+        'Total : ', e(ScoreVal, {v: totalScore(pi)})
+      )
+    ),
+    // Bid / tricks
+    e('div', {style:{display:'flex', flexWrap:'wrap', gap:12, marginBottom:10, alignItems:'center'}},
+      showBid && e('label', {style:{display:'flex', alignItems:'center', gap:7, fontFamily:"'Lato',sans-serif", fontSize:'.83rem', color:'#8a7a5a'}},
+        'Annonce :',
+        e('input', {type:'number', className:'num-input', min:0, max:roundNum, value: entry.bid === null ? '' : entry.bid,
+          onChange: ev => setBid(ev.target.value)})
+      ),
+      !showBid && entry.bid !== null && e('span', {style:{fontFamily:"'Lato',sans-serif", fontSize:'.83rem', color:'#8a7a5a'}},
+        'Annonce : ', e('strong', {style:{color:'#c9a84c'}}, entry.bid)
+      ),
+      showTricks && e('label', {style:{display:'flex', alignItems:'center', gap:7, fontFamily:"'Lato',sans-serif", fontSize:'.83rem', color:'#8a7a5a'}},
+        'Plis :',
+        e('input', {type:'number', className:'num-input', min:0, max:roundNum, value: entry.tricks === null ? '' : entry.tricks,
+          onChange: ev => setTricks(ev.target.value)})
+      )
+    ),
+    // Bonuses (only in tricks phase or edit mode)
+    (showTricks || !showBid) && e('div', null,
+      // Capture bonuses
+      e('div', {style:{display:'flex', flexWrap:'wrap', gap:5, marginBottom:6}},
+        CAPTURE_BONUSES.map(b => {
+          const active = !!entry.activeCapture[b.id];
+          return e('div', {key:b.id, className:'bonus-chip'+(active?' active':''), onClick:()=>toggleCapture(b)},
+            active?'✓':'+', ' ', b.label, ' ', e('strong', {style:{color:'#c9a84c'}}, '+'+b.points)
+          );
+        })
+      ),
+      // Card 14 bonuses
+      e('div', {style:{display:'flex', flexWrap:'wrap', gap:5, marginBottom:8}},
+        CARD14_BONUSES.map(b => {
+          const count = entry.activeCard14[b.id] || 0;
+          return e('div', {key:b.id, style:{display:'inline-flex', alignItems:'center', gap:4, padding:'3px 8px', borderRadius:20, border:'1px solid rgba(201,168,76,.22)', fontFamily:"'Lato',sans-serif", fontSize:'.7rem', background:'rgba(5,16,32,.6)'}},
+            e('span', {style:{color:b.color}}, '■'),
+            e('span', {style:{color:'#8a7a5a'}}, b.label),
+            e('span', {style:{color:'#c9a84c', fontWeight:700}}, '+'+b.points),
+            e('button', {className:'counter-btn', onClick:()=>setCard14(b, Math.max(0,count-1))}, '−'),
+            e('span', {style:{color:'#e8d5b0', minWidth:14, textAlign:'center'}}, count),
+            e('button', {className:'counter-btn', onClick:()=>setCard14(b, count+1)}, '+')
+          );
+        })
+      )
+    ),
+    // Round score
+    s !== null && e('div', {style:{textAlign:'right', fontFamily:"'Lato',sans-serif", fontSize:'.82rem', marginTop:8}},
+      'Ce tour : ', e(ScoreVal, {v:s})
+    )
+  );
 }
 
-const btnStyle = {
-  background:"rgba(201,168,76,.15)", border:"1px solid rgba(201,168,76,.3)",
-  color:"#c9a84c", borderRadius:4, width:22, height:22, cursor:"pointer",
-  lineHeight:1, padding:0, fontWeight:700, fontSize:"1rem"
-};
+// ── History table ─────────────────────────────────────────────────────────────
+function HistoryTable({rounds, players, onEdit}) {
+  function totalScore(pi) {
+    return rounds.reduce((sum, round, ri) => {
+      const en = round[pi];
+      if (!en || en.bid===null || en.tricks===null) return sum;
+      return sum + calcScore(en.bid, en.tricks, en.bonuses, ri+1);
+    }, 0);
+  }
+  return e('div', {style:{overflowX:'auto', padding:12, marginTop:8, borderRadius:10, background:'rgba(5,16,32,.88)', border:'1px solid rgba(201,168,76,.28)'}},
+    e('table', {style:{width:'100%', borderCollapse:'collapse', fontFamily:"'Lato',sans-serif", fontSize:'.75rem'}},
+      e('thead', null,
+        e('tr', null,
+          e('th', {style:{color:'#4a3f2a', textAlign:'left', padding:'4px 6px', borderBottom:'1px solid rgba(201,168,76,.2)'}}, 'M.'),
+          players.map((p,i) => e('th', {key:i, style:{color:SEA_COLORS[i%SEA_COLORS.length], padding:'4px 5px', borderBottom:'1px solid rgba(201,168,76,.2)', textAlign:'center'}}, p)),
+          e('th', {style:{borderBottom:'1px solid rgba(201,168,76,.2)', width:30}})
+        )
+      ),
+      e('tbody', null,
+        rounds.map((round, ri) =>
+          e('tr', {key:ri, style:{borderBottom:'1px solid rgba(201,168,76,.07)'}},
+            e('td', {style:{padding:'4px 6px', color:'#c9a84c', fontWeight:700}}, ri+1),
+            round.map((en, pi) => {
+              const s = en.bid!==null&&en.tricks!==null ? calcScore(en.bid,en.tricks,en.bonuses,ri+1) : null;
+              return e('td', {key:pi, style:{padding:'4px 5px', textAlign:'center'}},
+                e(ScoreVal, {v:s}),
+                s!==null && e('span', {style:{color:'#4a3f2a', marginLeft:2, fontSize:'.68rem'}}, '('+en.bid+'/'+en.tricks+')')
+              );
+            }),
+            e('td', {style:{padding:'4px 5px'}},
+              e('button', {onClick:()=>onEdit(ri), style:{background:'transparent', border:'1px solid rgba(201,168,76,.35)', color:'#c9a84c', borderRadius:6, padding:'1px 5px', cursor:'pointer', fontSize:'.68rem', fontFamily:"'Cinzel',serif"}}, '✏️')
+            )
+          )
+        ),
+        rounds.length > 0 && e('tr', {key:'total', style:{borderTop:'2px solid rgba(201,168,76,.3)'}},
+          e('td', {style:{padding:'4px 6px', color:'#8a7a5a', fontSize:'.7rem', fontFamily:"'Cinzel',serif"}}, 'TOTAL'),
+          players.map((_,pi) => e('td', {key:pi, style:{padding:'4px 5px', textAlign:'center'}}, e(ScoreVal, {v:totalScore(pi)}))),
+          e('td')
+        )
+      )
+    )
+  );
+}
 
+// ── Main component ────────────────────────────────────────────────────────────
 function SkullKing() {
   const savedGame = loadJSON(STORAGE_KEY_GAME, null);
 
-  const [players, setPlayers]         = useState(savedGame?.players || []);
-  const [nameInput, setNameInput]     = useState("");
-  const [phase, setPhase]             = useState(savedGame?.phase || "setup");
-  const [rounds, setRounds]           = useState(savedGame?.rounds || []);
-  const [currentRound, setCurrentRound] = useState(savedGame?.currentRound || 1);
-  const [bidPhase, setBidPhase]       = useState(savedGame?.bidPhase ?? true);
-  const [currentEntries, setCurrentEntries] = useState(savedGame?.currentEntries || []);
-  const [editingPast, setEditingPast] = useState(null);
-  const [pastEntries, setPastEntries] = useState([]);
-  const [showHistory, setShowHistory] = useState(false);
+  const [players, setPlayers]           = useState(savedGame && savedGame.players || []);
+  const [nameInput, setNameInput]       = useState('');
+  const [phase, setPhase]               = useState(savedGame && savedGame.phase || 'setup');
+  const [rounds, setRounds]             = useState(savedGame && savedGame.rounds || []);
+  const [currentRound, setCurrentRound] = useState(savedGame && savedGame.currentRound || 1);
+  const [bidPhase, setBidPhase]         = useState(savedGame ? savedGame.bidPhase : true);
+  const [currentEntries, setCurrentEntries] = useState(savedGame && savedGame.currentEntries || []);
+  const [editingPast, setEditingPast]   = useState(null);
+  const [pastEntries, setPastEntries]   = useState([]);
+  const [showHistory, setShowHistory]   = useState(false);
   const [showAddPlayer, setShowAddPlayer] = useState(false);
-  const [extraName, setExtraName]     = useState("");
+  const [extraName, setExtraName]       = useState('');
   const [knownPlayers, setKnownPlayers] = useState(() => loadJSON(STORAGE_KEY_PLAYERS, []));
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [showStats, setShowStats] = useState(false);
+  const [showStats, setShowStats]       = useState(false);
 
-  // Persist current game state on every change
   useEffect(() => {
-    saveJSON(STORAGE_KEY_GAME, { players, phase, rounds, currentRound, bidPhase, currentEntries });
+    saveJSON(STORAGE_KEY_GAME, {players, phase, rounds, currentRound, bidPhase, currentEntries});
   }, [players, phase, rounds, currentRound, bidPhase, currentEntries]);
 
-  // Remember player names across games
+  function totalScore(pi) {
+    return rounds.reduce((sum, round, ri) => {
+      const en = round[pi];
+      if (!en || en.bid===null || en.tricks===null) return sum;
+      return sum + calcScore(en.bid, en.tricks, en.bonuses, ri+1);
+    }, 0);
+  }
+
   function rememberPlayers(names) {
     setKnownPlayers(prev => {
-      const merged = [...prev];
+      const merged = prev.slice();
       names.forEach(n => {
-        const trimmed = n.trim();
-        if (!trimmed) return;
-        if (!merged.some(m => normalizeName(m) === normalizeName(trimmed))) {
-          merged.push(trimmed);
-        }
+        const t = n.trim();
+        if (t && !merged.some(m => norm(m)===norm(t))) merged.push(t);
       });
       saveJSON(STORAGE_KEY_PLAYERS, merged);
       return merged;
     });
   }
 
-  // Record stats happens inline in submitRound when the game ends
-
-  function totalScore(pi) {
-    return rounds.reduce((sum, round, ri) => {
-      const e = round[pi];
-      if (!e || e.bid === null || e.tricks === null) return sum;
-      return sum + calcScore(e.bid, e.tricks, e.bonuses, ri + 1);
-    }, 0);
-  }
-
   function addPlayer() {
     const name = nameInput.trim();
     if (!name || players.length >= 10) return;
-    setPlayers(p => [...p, name]);
+    setPlayers(p => p.concat(name));
     rememberPlayers([name]);
-    setNameInput("");
+    setNameInput('');
     setShowSuggestions(false);
   }
 
   function addPlayerMidGame() {
     const name = extraName.trim();
     if (!name || players.length >= 10) return;
-    setPlayers(p => [...p, name]);
+    setPlayers(p => p.concat(name));
     rememberPlayers([name]);
-    setRounds(rs => rs.map(r => [...r, emptyEntry()]));
-    setCurrentEntries(ce => [...ce, emptyEntry()]);
-    setPastEntries(pe => pe.length > 0 ? [...pe, emptyEntry()] : pe);
-    setExtraName("");
+    setRounds(rs => rs.map(r => r.concat(emptyEntry())));
+    setCurrentEntries(ce => ce.concat(emptyEntry()));
+    setPastEntries(pe => pe.length > 0 ? pe.concat(emptyEntry()) : pe);
+    setExtraName('');
     setShowAddPlayer(false);
   }
 
@@ -173,67 +290,38 @@ function SkullKing() {
     setBidPhase(true);
     setCurrentEntries(players.map(() => emptyEntry()));
     setEditingPast(null);
-    setPhase("playing");
-  }
-
-  function updateEntry(entries, setEntries, pi, patch) {
-    setEntries(entries.map((e, i) => i === pi ? { ...e, ...patch } : e));
-  }
-
-  function setField(entries, setEntries, pi, field, val) {
-    updateEntry(entries, setEntries, pi, { [field]: val });
-  }
-
-  function toggleCapture(entries, setEntries, pi, bonusId, pts) {
-    const e = entries[pi];
-    const was = !!e.activeCapture[bonusId];
-    updateEntry(entries, setEntries, pi, {
-      activeCapture: { ...e.activeCapture, [bonusId]: !was },
-      bonuses: e.bonuses + (was ? -pts : pts),
-    });
-  }
-
-  function setCard14(entries, setEntries, pi, bonusId, pts, count) {
-    const e = entries[pi];
-    const prev = e.activeCard14[bonusId] || 0;
-    updateEntry(entries, setEntries, pi, {
-      activeCard14: { ...e.activeCard14, [bonusId]: count },
-      bonuses: e.bonuses + (count - prev) * pts,
-    });
+    setPhase('playing');
   }
 
   function submitBids() {
-    if (currentEntries.some(e => e.bid === null)) return;
+    if (currentEntries.some(en => en.bid === null)) return;
     setBidPhase(false);
   }
 
   function submitRound() {
-    if (currentEntries.some(e => e.tricks === null)) return;
-    const newRounds = [...rounds, currentEntries.map(e => ({ ...e }))];
+    if (currentEntries.some(en => en.tricks === null)) return;
+    const newRounds = rounds.concat([currentEntries.map(en => Object.assign({}, en))]);
     setRounds(newRounds);
     if (currentRound >= MAX_ROUNDS) {
-      setPhase("results");
-      // compute final scores from newRounds directly (state not yet updated)
+      setPhase('results');
       const finalScores = players.map((name, pi) => ({
         name,
         score: newRounds.reduce((sum, round, ri) => {
-          const e = round[pi];
-          if (!e || e.bid === null || e.tricks === null) return sum;
-          return sum + calcScore(e.bid, e.tricks, e.bonuses, ri + 1);
+          const en = round[pi];
+          if (!en || en.bid===null || en.tricks===null) return sum;
+          return sum + calcScore(en.bid, en.tricks, en.bonuses, ri+1);
         }, 0)
       }));
       const stats = loadJSON(STORAGE_KEY_STATS, {});
-      const winnerScore = Math.max(...finalScores.map(p => p.score));
-      finalScores.forEach(({ name, score }) => {
-        const key = normalizeName(name);
-        if (!stats[key]) {
-          stats[key] = { displayName: name, gamesPlayed: 0, wins: 0, totalScore: 0, bestScore: -Infinity };
-        }
-        stats[key].displayName = name;
+      const winnerScore = Math.max.apply(null, finalScores.map(p => p.score));
+      finalScores.forEach(function(fp) {
+        const key = norm(fp.name);
+        if (!stats[key]) stats[key] = {displayName:fp.name, gamesPlayed:0, wins:0, totalScore:0, bestScore:-99999};
+        stats[key].displayName = fp.name;
         stats[key].gamesPlayed += 1;
-        stats[key].totalScore += score;
-        if (score > stats[key].bestScore) stats[key].bestScore = score;
-        if (score === winnerScore) stats[key].wins += 1;
+        stats[key].totalScore += fp.score;
+        if (fp.score > stats[key].bestScore) stats[key].bestScore = fp.score;
+        if (fp.score === winnerScore) stats[key].wins += 1;
       });
       saveJSON(STORAGE_KEY_STATS, stats);
     } else {
@@ -245,457 +333,259 @@ function SkullKing() {
 
   function openPastEdit(ri) {
     setEditingPast(ri);
-    setPastEntries(rounds[ri].map(e => ({ ...e })));
+    setPastEntries(rounds[ri].map(en => Object.assign({}, en)));
   }
 
   function savePastEdit() {
-    setRounds(rs => rs.map((r, ri) => ri === editingPast ? pastEntries.map(e => ({ ...e })) : r));
+    setRounds(rs => rs.map((r, ri) => ri === editingPast ? pastEntries.map(en => Object.assign({}, en)) : r));
     setEditingPast(null);
   }
 
   function restartGame() {
-    setPhase("setup"); setPlayers([]); setRounds([]);
-    setCurrentRound(1); setBidPhase(true); setEditingPast(null);
-    setShowHistory(false);
+    setPhase('setup'); setPlayers([]); setRounds([]);
+    setCurrentRound(1); setBidPhase(true); setEditingPast(null); setShowHistory(false);
     localStorage.removeItem(STORAGE_KEY_GAME);
   }
 
-  const sortedResults = [...players.map((name, i) => ({ name, score: totalScore(i), color: SEA_COLORS[i % SEA_COLORS.length] }))]
-    .sort((a, b) => b.score - a.score);
+  const sortedResults = players.map((name, i) => ({name, score:totalScore(i), color:SEA_COLORS[i%SEA_COLORS.length]}))
+    .sort((a,b) => b.score - a.score);
 
-  function EntryCard({ pi, entry, entries, setEntries, roundNum, showBid, showTricks }) {
-    const s = entry.bid !== null && entry.tricks !== null
-      ? calcScore(entry.bid, entry.tricks, entry.bonuses, roundNum) : null;
+  const entryCardProps = {players, phase, totalScore};
 
-    return (
-      <div style={{ padding:14, marginBottom:10, borderRadius:10, background:"rgba(5,16,32,.88)", border:"1px solid rgba(201,168,76,.28)", borderLeft:`3px solid ${SEA_COLORS[pi%SEA_COLORS.length]}` }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            <div style={{ width:8, height:8, borderRadius:"50%", background:SEA_COLORS[pi%SEA_COLORS.length] }}/>
-            <span style={{ fontWeight:700, fontFamily:"'Cinzel',serif", color:"#e8d5b0" }}>{players[pi]}</span>
-          </div>
-          {phase==="playing" && (
-            <span style={{ fontFamily:"'Lato',sans-serif", fontSize:".78rem", color:"#8a7a5a" }}>
-              Total : <ScoreVal v={totalScore(pi)} />
-            </span>
-          )}
-        </div>
-
-        <div style={{ display:"flex", flexWrap:"wrap", gap:12, marginBottom:10, alignItems:"center" }}>
-          {showBid && (
-            <label style={{ display:"flex", alignItems:"center", gap:7, fontFamily:"'Lato',sans-serif", fontSize:".83rem", color:"#8a7a5a" }}>
-              Annonce :
-              <input type="number" min={0} max={roundNum}
-                value={entry.bid ?? ""}
-                onChange={ev => setField(entries, setEntries, pi, "bid", Math.max(0, Math.min(roundNum, parseInt(ev.target.value)||0)))}
-                style={{ background:"rgba(201,168,76,.1)", border:"1px solid rgba(201,168,76,.4)", color:"#e8d5b0", borderRadius:6, padding:"5px 8px", fontFamily:"'Cinzel',serif", fontSize:"1rem", width:52, textAlign:"center", outline:"none" }} />
-            </label>
-          )}
-          {!showBid && entry.bid !== null && (
-            <span style={{ fontFamily:"'Lato',sans-serif", fontSize:".83rem", color:"#8a7a5a" }}>
-              Annonce : <strong style={{ color:"#c9a84c" }}>{entry.bid}</strong>
-            </span>
-          )}
-          {showTricks && (
-            <label style={{ display:"flex", alignItems:"center", gap:7, fontFamily:"'Lato',sans-serif", fontSize:".83rem", color:"#8a7a5a" }}>
-              Plis :
-              <input type="number" min={0} max={roundNum}
-                value={entry.tricks ?? ""}
-                onChange={ev => setField(entries, setEntries, pi, "tricks", Math.max(0, Math.min(roundNum, parseInt(ev.target.value)||0)))}
-                style={{ background:"rgba(201,168,76,.1)", border:"1px solid rgba(201,168,76,.4)", color:"#e8d5b0", borderRadius:6, padding:"5px 8px", fontFamily:"'Cinzel',serif", fontSize:"1rem", width:52, textAlign:"center", outline:"none" }} />
-            </label>
-          )}
-        </div>
-
-        {(showTricks || !showBid) && (
-          <>
-            <div style={{ display:"flex", flexWrap:"wrap", gap:5, marginBottom:6 }}>
-              {CAPTURE_BONUSES.map(b => {
-                const active = !!entry.activeCapture[b.id];
-                return (
-                  <div key={b.id} onClick={() => toggleCapture(entries, setEntries, pi, b.id, b.points)}
-                    style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"3px 8px", borderRadius:20, cursor:"pointer", userSelect:"none", fontFamily:"'Lato',sans-serif", fontSize:".7rem", transition:"all .15s",
-                      border: active ? "1px solid #c9a84c" : "1px solid rgba(201,168,76,.3)",
-                      background: active ? "rgba(201,168,76,.22)" : "transparent",
-                      color: active ? "#c9a84c" : "#8a7a5a" }}>
-                    <span>{active?"✓":"+"}</span><span>{b.label}</span><strong style={{color:"#c9a84c"}}>+{b.points}</strong>
-                  </div>
-                );
-              })}
-            </div>
-            <div style={{ display:"flex", flexWrap:"wrap", gap:5 }}>
-              {CARD14_BONUSES.map(b => {
-                const count = entry.activeCard14[b.id] || 0;
-                return (
-                  <div key={b.id} style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"3px 8px", borderRadius:20, border:"1px solid rgba(201,168,76,.22)", fontFamily:"'Lato',sans-serif", fontSize:".7rem", background:"rgba(5,16,32,.6)" }}>
-                    <span style={{color:b.color}}>■</span>
-                    <span style={{color:"#8a7a5a"}}>{b.label}</span>
-                    <span style={{color:"#c9a84c", fontWeight:700}}>+{b.points}</span>
-                    <button onClick={() => setCard14(entries, setEntries, pi, b.id, b.points, Math.max(0,count-1))} style={btnStyle}>−</button>
-                    <span style={{color:"#e8d5b0", minWidth:14, textAlign:"center"}}>{count}</span>
-                    <button onClick={() => setCard14(entries, setEntries, pi, b.id, b.points, count+1)} style={btnStyle}>+</button>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-
-        {s !== null && (
-          <div style={{ textAlign:"right", fontFamily:"'Lato',sans-serif", fontSize:".82rem", marginTop:8 }}>
-            Ce tour : <ScoreVal v={s} />
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  function HistoryTable() {
-    return (
-      <div style={{ overflowX:"auto", padding:12, marginTop:8, borderRadius:10, background:"rgba(5,16,32,.88)", border:"1px solid rgba(201,168,76,.28)" }}>
-        <table style={{ width:"100%", borderCollapse:"collapse", fontFamily:"'Lato',sans-serif", fontSize:".75rem" }}>
-          <thead>
-            <tr>
-              <th style={{ color:"#4a3f2a", textAlign:"left", padding:"4px 6px", borderBottom:"1px solid rgba(201,168,76,.2)" }}>M.</th>
-              {players.map((p,i) => (
-                <th key={i} style={{ color:SEA_COLORS[i%SEA_COLORS.length], padding:"4px 5px", borderBottom:"1px solid rgba(201,168,76,.2)", textAlign:"center" }}>{p}</th>
-              ))}
-              <th style={{ borderBottom:"1px solid rgba(201,168,76,.2)", width:30 }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {rounds.map((round, ri) => (
-              <tr key={ri} style={{ borderBottom:"1px solid rgba(201,168,76,.07)" }}>
-                <td style={{ padding:"4px 6px", color:"#c9a84c", fontWeight:700 }}>{ri+1}</td>
-                {round.map((e, pi) => {
-                  const s = e.bid!==null&&e.tricks!==null ? calcScore(e.bid,e.tricks,e.bonuses,ri+1) : null;
-                  return (
-                    <td key={pi} style={{ padding:"4px 5px", textAlign:"center" }}>
-                      <ScoreVal v={s} />
-                      {s !== null && <span style={{ color:"#4a3f2a", marginLeft:2, fontSize:".68rem" }}>({e.bid}/{e.tricks})</span>}
-                    </td>
-                  );
-                })}
-                <td style={{ padding:"4px 5px" }}>
-                  <button onClick={() => openPastEdit(ri)}
-                    style={{ background:"transparent", border:"1px solid rgba(201,168,76,.35)", color:"#c9a84c", borderRadius:6, padding:"1px 5px", cursor:"pointer", fontSize:".68rem", fontFamily:"'Cinzel',serif" }}>✏️</button>
-                </td>
-              </tr>
-            ))}
-            {rounds.length > 0 && (
-              <tr style={{ borderTop:"2px solid rgba(201,168,76,.3)" }}>
-                <td style={{ padding:"4px 6px", color:"#8a7a5a", fontSize:".7rem", fontFamily:"'Cinzel',serif" }}>TOTAL</td>
-                {players.map((_,pi) => (
-                  <td key={pi} style={{ padding:"4px 5px", textAlign:"center" }}><ScoreVal v={totalScore(pi)} /></td>
-                ))}
-                <td></td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    );
-  }
-
-  const GoldBtn = ({ onClick, disabled, children, style={} }) => (
-    <button onClick={onClick} disabled={disabled}
-      style={{ background: disabled ? "rgba(139,105,20,.3)" : "linear-gradient(135deg,#c9a84c,#8b6914)", color: disabled ? "#666" : "#000", border:"none", borderRadius:8, padding:"10px 20px", fontFamily:"'Cinzel',serif", fontWeight:700, cursor: disabled ? "not-allowed" : "pointer", letterSpacing:".05em", transition:"all .2s", ...style }}>
-      {children}
-    </button>
+  // ── Phase filtering for suggestions
+  const suggestions = knownPlayers.filter(kp =>
+    !players.some(p => norm(p)===norm(kp)) &&
+    (!nameInput.trim() || norm(kp).includes(norm(nameInput)))
   );
 
-  const GhostBtn = ({ onClick, children, style={} }) => (
-    <button onClick={onClick}
-      style={{ background:"transparent", border:"1px solid rgba(201,168,76,.4)", color:"#c9a84c", borderRadius:8, padding:"8px 16px", fontFamily:"'Cinzel',serif", cursor:"pointer", transition:"all .2s", ...style }}>
-      {children}
-    </button>
-  );
+  // ── Render ────────────────────────────────────────────────────────────────
+  return e('div', {style:{minHeight:'100vh', background:'radial-gradient(ellipse at 60% 0%,#0d2137 0%,#051020 60%,#000 100%)', position:'relative', overflow:'hidden'}},
+    e('div', {className:'sk-skull'}, '💀'),
+    e('div', {className:'sk-wave'}),
+    e('div', {className:'sk-wave sk-wave2'}),
 
-  const inputStyle = { flex:1, background:"rgba(201,168,76,.1)", border:"1px solid rgba(201,168,76,.4)", color:"#e8d5b0", borderRadius:8, padding:"10px 13px", fontFamily:"'Cinzel',serif", outline:"none", fontSize:"1rem" };
+    e('div', {style:{position:'relative', zIndex:1, maxWidth:700, margin:'0 auto', padding:'20px 13px 90px'}},
 
-  return (
-    <div style={{ minHeight:"100vh", background:"radial-gradient(ellipse at 60% 0%,#0d2137 0%,#051020 60%,#000 100%)", fontFamily:"'Cinzel','Georgia',serif", color:"#e8d5b0", position:"relative", overflow:"hidden" }}>
-      <style>{`
-        .sk-wave{position:fixed;bottom:0;left:0;width:200%;height:70px;background:rgba(13,33,55,.45);border-radius:50%;animation:skwave 8s linear infinite;z-index:0}
-        .sk-wave2{animation-delay:-4s;opacity:.45;bottom:8px}
-        @keyframes skwave{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-        .sk-skull{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:28vw;opacity:.025;z-index:0;pointer-events:none;user-select:none}
-        .sk-slide{animation:skslide .32s ease}
-        @keyframes skslide{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-        .sk-card{background:rgba(5,16,32,.88);border:1px solid rgba(201,168,76,.3);border-radius:12px;backdrop-filter:blur(10px)}
-        .sk-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:50;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto}
-        .sk-modal{background:#051020;border:1px solid rgba(201,168,76,.5);border-radius:14px;padding:22px;width:100%;max-width:680px;max-height:88vh;overflow-y:auto}
-        .sk-rdot{width:9px;height:9px;border-radius:50%;background:#c9a84c;opacity:.2;flex-shrink:0}
-        .sk-rdot.done{opacity:1}.sk-rdot.current{opacity:1;box-shadow:0 0 8px #c9a84c}
-        input[type=number]::-webkit-inner-spin-button{opacity:.4}
-        body{-webkit-tap-highlight-color:transparent;}
-      `}</style>
+      // Header
+      e('div', {style:{textAlign:'center', marginBottom:24}},
+        e('div', {style:{fontSize:'2.2rem', marginBottom:2}}, '💀'),
+        e('h1', {style:{margin:0, fontSize:'1.85rem', fontWeight:900, letterSpacing:'.08em', color:'#c9a84c', textShadow:'0 0 28px rgba(201,168,76,.5)'}}, 'SKULL KING'),
+        e('p', {style:{margin:'3px 0 0', fontFamily:"'Lato',sans-serif", color:'#8a7a5a', fontSize:'.75rem', letterSpacing:'.22em'}}, 'COMPTEUR DE POINTS')
+      ),
 
-      <div className="sk-skull">💀</div>
-      <div className="sk-wave"/><div className="sk-wave sk-wave2"/>
+      // ══ SETUP ══
+      phase === 'setup' && e('div', {className:'sk-card', style:{padding:24}},
+        e('div', {style:{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:15}},
+          e('h2', {style:{margin:0, fontSize:'1rem', color:'#c9a84c', letterSpacing:'.1em'}}, 'Joueurs ('+players.length+'/10)'),
+          e(GhostBtn, {onClick:()=>setShowStats(true), style:{fontSize:'.72rem', padding:'5px 11px'}}, '📊 Statistiques')
+        ),
+        e('div', {style:{display:'flex', gap:9, marginBottom:10}},
+          e('input', {className:'text-input', value:nameInput, placeholder:'Nom du joueur…',
+            onChange:ev=>setNameInput(ev.target.value),
+            onFocus:()=>setShowSuggestions(true),
+            onKeyDown:ev=>ev.key==='Enter'&&addPlayer()}),
+          e(GoldBtn, {onClick:addPlayer, disabled:!nameInput.trim()||players.length>=10}, '+')
+        ),
+        showSuggestions && suggestions.length > 0 && e('div', {style:{display:'flex', flexWrap:'wrap', gap:6, marginBottom:15}},
+          suggestions.map(kp => e('div', {key:kp, className:'suggestion-chip',
+            onClick:()=>{setPlayers(p=>p.concat(kp)); setNameInput('');}}, '+ '+kp))
+        ),
+        e('div', {style:{display:'flex', flexDirection:'column', gap:7, minHeight:44, marginBottom:20}},
+          players.length === 0
+            ? e('p', {style:{color:'#4a3f2a', fontFamily:"'Lato',sans-serif", fontSize:'.85rem', textAlign:'center', margin:'auto'}}, 'Ajoutez au moins 2 joueurs')
+            : players.map((p,i) => e('div', {key:i, style:{display:'flex', alignItems:'center', gap:8, padding:'8px 13px', borderRadius:8, background:'rgba(201,168,76,.08)', border:'1px solid rgba(201,168,76,.2)'}},
+                e('div', {style:{width:9, height:9, borderRadius:'50%', background:SEA_COLORS[i%SEA_COLORS.length], flexShrink:0}}),
+                e('span', {style:{flex:1, fontFamily:"'Lato',sans-serif"}}, p),
+                e('button', {onClick:()=>setPlayers(ps=>ps.filter((_,idx)=>idx!==i)),
+                  style:{background:'none', border:'none', color:'#f87171', cursor:'pointer', fontSize:'1.1rem', padding:'0 3px'}}, '×')
+              ))
+        ),
+        e(GoldBtn, {onClick:startGame, disabled:players.length<2, style:{width:'100%', fontSize:'1rem', padding:13}}, '⚓ Commencer la partie')
+      ),
 
-      <div style={{ position:"relative", zIndex:1, maxWidth:700, margin:"0 auto", padding:"20px 13px 90px" }}>
+      // ══ PLAYING ══
+      phase === 'playing' && e('div', null,
+        // Progress dots
+        e('div', {style:{display:'flex', justifyContent:'center', gap:5, marginBottom:15, flexWrap:'wrap'}},
+          Array.from({length:MAX_ROUNDS}, (_,i) =>
+            e('div', {key:i, className:'sk-rdot'+(i+1<currentRound?' done':i+1===currentRound?' current':''), title:'Manche '+(i+1)})
+          )
+        ),
+        // Round header
+        e('div', {className:'sk-card', style:{padding:16, marginBottom:11}},
+          e('div', {style:{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}},
+            e('div', null,
+              e('p', {style:{margin:0, fontFamily:"'Lato',sans-serif", color:'#8a7a5a', fontSize:'.7rem', letterSpacing:'.15em'}}, 'MANCHE'),
+              e('p', {style:{margin:0, fontSize:'1.6rem', fontWeight:900, color:'#c9a84c', lineHeight:1}},
+                currentRound, e('span', {style:{fontSize:'.82rem', color:'#4a3f2a'}}, ' / '+MAX_ROUNDS)
+              )
+            ),
+            e('div', {style:{display:'flex', gap:8, alignItems:'center'}},
+              e(GhostBtn, {onClick:()=>setShowAddPlayer(true), style:{fontSize:'.7rem', padding:'5px 9px'}}, '+ Joueur'),
+              e('div', {style:{textAlign:'right'}},
+                e('p', {style:{margin:0, fontFamily:"'Lato',sans-serif", color:'#8a7a5a', fontSize:'.7rem', letterSpacing:'.15em'}}, 'CARTES'),
+                e('p', {style:{margin:0, fontSize:'1.6rem', fontWeight:900, color:'#c9a84c', lineHeight:1}}, currentRound)
+              )
+            )
+          ),
+          e('div', {style:{textAlign:'center', marginTop:9}},
+            e('span', {style:{display:'inline-block', padding:'3px 13px', borderRadius:20,
+              background: bidPhase?'rgba(201,168,76,.17)':'rgba(74,222,128,.11)',
+              border: '1px solid '+(bidPhase?'rgba(201,168,76,.5)':'rgba(74,222,128,.4)'),
+              color: bidPhase?'#c9a84c':'#4ade80', fontFamily:"'Lato',sans-serif", fontSize:'.74rem'}},
+              bidPhase ? '📋 Phase d\'annonces' : '🃏 Phase de résultats'
+            )
+          ),
+          e('div', {style:{textAlign:'center', marginTop:8}},
+            e('span', {onClick:()=>{ if(window.confirm('Abandonner la partie en cours ?')) restartGame(); },
+              style:{fontFamily:"'Lato',sans-serif", fontSize:'.7rem', color:'#4a3f2a', cursor:'pointer', textDecoration:'underline'}},
+              'Abandonner la partie'
+            )
+          )
+        ),
+        // Player entry cards
+        players.map((_, pi) => e(EntryCard, Object.assign({key:pi, pi, entry:currentEntries[pi]||emptyEntry(), entries:currentEntries, setEntries:setCurrentEntries, roundNum:currentRound, showBid:bidPhase, showTricks:!bidPhase}, entryCardProps))),
+        // Action buttons
+        e('div', {style:{display:'flex', gap:9, marginTop:4}},
+          bidPhase
+            ? e(GoldBtn, {onClick:submitBids, disabled:currentEntries.some(en=>en.bid===null), style:{flex:1}}, 'Valider les annonces →')
+            : e(React.Fragment, null,
+                e(GhostBtn, {onClick:()=>setBidPhase(true)}, '← Annonces'),
+                e(GoldBtn, {onClick:submitRound, disabled:currentEntries.some(en=>en.tricks===null), style:{flex:1}},
+                  currentRound < MAX_ROUNDS ? 'Manche suivante →' : '🏴‍☠️ Fin de partie'
+                )
+              )
+        ),
+        // History accordion
+        e('div', {style:{marginTop:18}},
+          e('div', {onClick:()=>setShowHistory(h=>!h), style:{display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'9px 13px', borderRadius:10, background:'rgba(201,168,76,.05)', border:'1px solid rgba(201,168,76,.13)'}},
+            e('span', {style:{fontFamily:"'Lato',sans-serif", fontSize:'.8rem', color:'#8a7a5a'}},
+              '📊 Scores & historique'+(rounds.length>0?' ('+rounds.length+' manche'+(rounds.length>1?'s':'')+')':'')
+            ),
+            e('span', {style:{color:'#c9a84c'}}, showHistory?'▲':'▼')
+          ),
+          showHistory && rounds.length > 0 && e(HistoryTable, {rounds, players, onEdit:openPastEdit}),
+          showHistory && rounds.length === 0 && e('p', {style:{textAlign:'center', color:'#4a3f2a', fontFamily:"'Lato',sans-serif", fontSize:'.8rem', padding:'10px 0'}}, 'Aucune manche terminée pour l\'instant.')
+        )
+      ),
 
-        <div style={{ textAlign:"center", marginBottom:24 }}>
-          <div style={{ fontSize:"2.2rem", marginBottom:2 }}>💀</div>
-          <h1 style={{ margin:0, fontSize:"1.85rem", fontWeight:900, letterSpacing:".08em", color:"#c9a84c", textShadow:"0 0 28px rgba(201,168,76,.5)" }}>SKULL KING</h1>
-          <p style={{ margin:"3px 0 0", fontFamily:"'Lato',sans-serif", color:"#8a7a5a", fontSize:".75rem", letterSpacing:".22em" }}>COMPTEUR DE POINTS</p>
-        </div>
+      // ══ RESULTS ══
+      phase === 'results' && e('div', null,
+        e('div', {className:'sk-card', style:{padding:24, textAlign:'center', marginBottom:14}},
+          e('div', {style:{fontSize:'2.6rem', marginBottom:6}}, '🏆'),
+          e('h2', {style:{margin:'0 0 3px', color:'#c9a84c', fontSize:'1.4rem'}}, 'Fin de partie !'),
+          e('p', {style:{margin:0, fontFamily:"'Lato',sans-serif", color:'#8a7a5a'}}, 'Résultats après '+MAX_ROUNDS+' manches')
+        ),
+        sortedResults.map((p, rank) =>
+          e('div', {key:p.name, className:'sk-card', style:{padding:15, marginBottom:9, borderLeft:'3px solid '+p.color, background:rank===0?'rgba(201,168,76,.09)':undefined}},
+            e('div', {style:{display:'flex', alignItems:'center', gap:13}},
+              e('div', {style:{width:34, height:34, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:900, fontSize:rank===0?'1.1rem':'.95rem', background:rank===0?'linear-gradient(135deg,#c9a84c,#8b6914)':'rgba(201,168,76,.1)', color:rank===0?'#000':'#c9a84c'}},
+                rank===0?'👑':rank+1
+              ),
+              e('div', {style:{flex:1}},
+                e('div', {style:{fontWeight:700}}, p.name),
+                rank===0 && e('div', {style:{fontFamily:"'Lato',sans-serif", fontSize:'.74rem', color:'#c9a84c'}}, 'Grand Capitaine !')
+              ),
+              e('div', {style:{textAlign:'right'}},
+                e('div', {style:{fontSize:'1.35rem'}}, e(ScoreVal, {v:p.score})),
+                e('div', {style:{fontFamily:"'Lato',sans-serif", fontSize:'.68rem', color:'#4a3f2a'}}, 'points')
+              )
+            )
+          )
+        ),
+        e('div', {style:{marginTop:16}},
+          e('div', {onClick:()=>setShowHistory(h=>!h), style:{display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'9px 13px', borderRadius:10, background:'rgba(201,168,76,.05)', border:'1px solid rgba(201,168,76,.13)'}},
+            e('span', {style:{fontFamily:"'Lato',sans-serif", fontSize:'.8rem', color:'#8a7a5a'}}, '📋 Détail manche par manche'),
+            e('span', {style:{color:'#c9a84c'}}, showHistory?'▲':'▼')
+          ),
+          showHistory && e(HistoryTable, {rounds, players, onEdit:openPastEdit})
+        ),
+        e(GoldBtn, {onClick:restartGame, style:{width:'100%', marginTop:16, fontSize:'1rem', padding:14}}, '⚓ Nouvelle partie')
+      )
+    ),
 
-        {phase === "setup" && (
-          <div className="sk-card sk-slide" style={{ padding:24 }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:15 }}>
-              <h2 style={{ margin:0, fontSize:"1rem", color:"#c9a84c", letterSpacing:".1em" }}>Joueurs ({players.length}/10)</h2>
-              <GhostBtn onClick={()=>setShowStats(true)} style={{ fontSize:".72rem", padding:"5px 11px" }}>📊 Statistiques</GhostBtn>
-            </div>
-            <div style={{ display:"flex", gap:9, marginBottom:10 }}>
-              <input value={nameInput} onChange={e=>setNameInput(e.target.value)}
-                onFocus={()=>setShowSuggestions(true)}
-                onKeyDown={e=>e.key==="Enter"&&addPlayer()} placeholder="Nom du joueur…" style={inputStyle} />
-              <GoldBtn onClick={addPlayer} disabled={!nameInput.trim()||players.length>=10}>+</GoldBtn>
-            </div>
+    // ══ MODAL add player ══
+    showAddPlayer && e('div', {className:'sk-overlay', onClick:()=>setShowAddPlayer(false)},
+      e('div', {className:'sk-modal', onClick:ev=>ev.stopPropagation()},
+        e('h3', {style:{margin:'0 0 13px', color:'#c9a84c'}}, 'Ajouter un joueur'),
+        e('div', {style:{display:'flex', gap:9, marginBottom:11}},
+          e('input', {className:'text-input', value:extraName, placeholder:'Nom du joueur…',
+            onChange:ev=>setExtraName(ev.target.value),
+            onKeyDown:ev=>ev.key==='Enter'&&addPlayerMidGame()})
+        ),
+        e('p', {style:{fontFamily:"'Lato',sans-serif", fontSize:'.78rem', color:'#8a7a5a', marginBottom:15}},
+          'Le joueur sera ajouté avec 0 point pour les manches déjà jouées.'
+        ),
+        e('div', {style:{display:'flex', gap:9}},
+          e(GhostBtn, {onClick:()=>setShowAddPlayer(false)}, 'Annuler'),
+          e(GoldBtn, {onClick:addPlayerMidGame, disabled:!extraName.trim()||players.length>=10, style:{flex:1}}, 'Ajouter')
+        )
+      )
+    ),
 
-            {/* Suggestions of known players not yet added */}
-            {showSuggestions && knownPlayers.filter(kp => !players.some(p => normalizeName(p)===normalizeName(kp))
-              && (!nameInput.trim() || normalizeName(kp).includes(normalizeName(nameInput)))).length > 0 && (
-              <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:15 }}>
-                {knownPlayers
-                  .filter(kp => !players.some(p => normalizeName(p)===normalizeName(kp))
-                    && (!nameInput.trim() || normalizeName(kp).includes(normalizeName(nameInput))))
-                  .map(kp => (
-                    <div key={kp} onClick={() => { setPlayers(p=>[...p, kp]); setNameInput(""); }}
-                      style={{ padding:"4px 11px", borderRadius:20, border:"1px solid rgba(201,168,76,.3)",
-                        background:"rgba(201,168,76,.06)", color:"#c9a84c", fontFamily:"'Lato',sans-serif",
-                        fontSize:".78rem", cursor:"pointer", userSelect:"none" }}>
-                      + {kp}
-                    </div>
-                  ))}
-              </div>
-            )}
+    // ══ MODAL edit past round ══
+    editingPast !== null && e('div', {className:'sk-overlay', onClick:()=>setEditingPast(null)},
+      e('div', {className:'sk-modal', onClick:ev=>ev.stopPropagation()},
+        e('h3', {style:{margin:'0 0 4px', color:'#c9a84c'}}, 'Modifier — Manche '+(editingPast+1)),
+        e('p', {style:{margin:'0 0 13px', fontFamily:"'Lato',sans-serif", fontSize:'.78rem', color:'#8a7a5a'}},
+          (editingPast+1)+' carte'+(editingPast>0?'s':'')+' · Modifiez annonces, plis et bonus ci-dessous'
+        ),
+        players.map((_, pi) => e(EntryCard, Object.assign({key:pi, pi, entry:pastEntries[pi]||emptyEntry(), entries:pastEntries, setEntries:setPastEntries, roundNum:editingPast+1, showBid:true, showTricks:true}, entryCardProps))),
+        e('div', {style:{display:'flex', gap:9, marginTop:8}},
+          e(GhostBtn, {onClick:()=>setEditingPast(null)}, 'Annuler'),
+          e(GoldBtn, {onClick:savePastEdit, style:{flex:1}}, '💾 Sauvegarder')
+        )
+      )
+    ),
 
-            <div style={{ display:"flex", flexDirection:"column", gap:7, minHeight:44, marginBottom:20 }}>
-              {players.map((p,i) => (
-                <div key={i} className="sk-slide" style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 13px", borderRadius:8, background:"rgba(201,168,76,.08)", border:"1px solid rgba(201,168,76,.2)" }}>
-                  <div style={{ width:9, height:9, borderRadius:"50%", background:SEA_COLORS[i%SEA_COLORS.length], flexShrink:0 }}/>
-                  <span style={{ flex:1, fontFamily:"'Lato',sans-serif" }}>{p}</span>
-                  <button onClick={()=>setPlayers(ps=>ps.filter((_,idx)=>idx!==i))}
-                    style={{ background:"none", border:"none", color:"#f87171", cursor:"pointer", fontSize:"1.1rem", padding:"0 3px" }}>×</button>
-                </div>
-              ))}
-              {players.length===0 && <p style={{ color:"#4a3f2a", fontFamily:"'Lato',sans-serif", fontSize:".85rem", textAlign:"center", margin:"auto" }}>Ajoutez au moins 2 joueurs</p>}
-            </div>
-            <GoldBtn onClick={startGame} disabled={players.length<2} style={{ width:"100%", fontSize:"1rem", padding:13 }}>⚓ Commencer la partie</GoldBtn>
-          </div>
-        )}
-
-        {phase === "playing" && (
-          <div className="sk-slide">
-            <div style={{ display:"flex", justifyContent:"center", gap:5, marginBottom:15, flexWrap:"wrap" }}>
-              {Array.from({length:MAX_ROUNDS},(_,i)=>(
-                <div key={i} className={`sk-rdot ${i+1<currentRound?"done":i+1===currentRound?"current":""}`} title={`Manche ${i+1}`}/>
-              ))}
-            </div>
-
-            <div className="sk-card" style={{ padding:16, marginBottom:11 }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-                <div>
-                  <p style={{ margin:0, fontFamily:"'Lato',sans-serif", color:"#8a7a5a", fontSize:".7rem", letterSpacing:".15em" }}>MANCHE</p>
-                  <p style={{ margin:0, fontSize:"1.6rem", fontWeight:900, color:"#c9a84c", lineHeight:1 }}>
-                    {currentRound} <span style={{ fontSize:".82rem", color:"#4a3f2a" }}>/ {MAX_ROUNDS}</span>
-                  </p>
-                </div>
-                <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                  <GhostBtn onClick={()=>setShowAddPlayer(true)} style={{ fontSize:".7rem", padding:"5px 9px" }}>+ Joueur</GhostBtn>
-                  <div style={{ textAlign:"right" }}>
-                    <p style={{ margin:0, fontFamily:"'Lato',sans-serif", color:"#8a7a5a", fontSize:".7rem", letterSpacing:".15em" }}>CARTES</p>
-                    <p style={{ margin:0, fontSize:"1.6rem", fontWeight:900, color:"#c9a84c", lineHeight:1 }}>{currentRound}</p>
-                  </div>
-                </div>
-              </div>
-              <div style={{ textAlign:"center", marginTop:9 }}>
-                <span style={{ display:"inline-block", padding:"3px 13px", borderRadius:20,
-                  background:bidPhase?"rgba(201,168,76,.17)":"rgba(74,222,128,.11)",
-                  border:`1px solid ${bidPhase?"rgba(201,168,76,.5)":"rgba(74,222,128,.4)"}`,
-                  color:bidPhase?"#c9a84c":"#4ade80", fontFamily:"'Lato',sans-serif", fontSize:".74rem" }}>
-                  {bidPhase ? "📋 Phase d'annonces" : "🃏 Phase de résultats"}
-                </span>
-              </div>
-              <div style={{ textAlign:"center", marginTop:8 }}>
-                <span onClick={()=>{ if(window.confirm("Abandonner la partie en cours ?")) restartGame(); }}
-                  style={{ fontFamily:"'Lato',sans-serif", fontSize:".7rem", color:"#4a3f2a", cursor:"pointer", textDecoration:"underline" }}>
-                  Abandonner la partie
-                </span>
-              </div>
-            </div>
-
-            {players.map((_, pi) => (
-              <EntryCard key={pi} pi={pi}
-                entry={currentEntries[pi]||emptyEntry()}
-                entries={currentEntries} setEntries={setCurrentEntries}
-                roundNum={currentRound} showBid={bidPhase} showTricks={!bidPhase} />
-            ))}
-
-            <div style={{ display:"flex", gap:9, marginTop:4 }}>
-              {bidPhase ? (
-                <GoldBtn onClick={submitBids} disabled={currentEntries.some(e=>e.bid===null)} style={{ flex:1 }}>Valider les annonces →</GoldBtn>
-              ) : (
-                <>
-                  <GhostBtn onClick={()=>setBidPhase(true)}>← Annonces</GhostBtn>
-                  <GoldBtn onClick={submitRound} disabled={currentEntries.some(e=>e.tricks===null)} style={{ flex:1 }}>
-                    {currentRound<MAX_ROUNDS?"Manche suivante →":"🏴‍☠️ Fin de partie"}
-                  </GoldBtn>
-                </>
-              )}
-            </div>
-
-            <div style={{ marginTop:18 }}>
-              <div onClick={()=>setShowHistory(h=>!h)} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", padding:"9px 13px", borderRadius:10, background:"rgba(201,168,76,.05)", border:"1px solid rgba(201,168,76,.13)" }}>
-                <span style={{ fontFamily:"'Lato',sans-serif", fontSize:".8rem", color:"#8a7a5a" }}>
-                  📊 Scores & historique {rounds.length>0?`(${rounds.length} manche${rounds.length>1?"s":""})` : ""}
-                </span>
-                <span style={{ color:"#c9a84c" }}>{showHistory?"▲":"▼"}</span>
-              </div>
-              {showHistory && rounds.length>0 && <HistoryTable />}
-              {showHistory && rounds.length===0 && (
-                <p style={{ textAlign:"center", color:"#4a3f2a", fontFamily:"'Lato',sans-serif", fontSize:".8rem", padding:"10px 0" }}>Aucune manche terminée pour l'instant.</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {phase === "results" && (
-          <div className="sk-slide">
-            <div className="sk-card" style={{ padding:24, textAlign:"center", marginBottom:14 }}>
-              <div style={{ fontSize:"2.6rem", marginBottom:6 }}>🏆</div>
-              <h2 style={{ margin:"0 0 3px", color:"#c9a84c", fontSize:"1.4rem" }}>Fin de partie !</h2>
-              <p style={{ margin:0, fontFamily:"'Lato',sans-serif", color:"#8a7a5a" }}>Résultats après {MAX_ROUNDS} manches</p>
-            </div>
-
-            {sortedResults.map((p,rank) => (
-              <div key={p.name} className="sk-card sk-slide" style={{ padding:15, marginBottom:9, borderLeft:`3px solid ${p.color}`, background:rank===0?"rgba(201,168,76,.09)":undefined }}>
-                <div style={{ display:"flex", alignItems:"center", gap:13 }}>
-                  <div style={{ width:34, height:34, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900, fontSize:rank===0?"1.1rem":".95rem",
-                    background:rank===0?"linear-gradient(135deg,#c9a84c,#8b6914)":"rgba(201,168,76,.1)", color:rank===0?"#000":"#c9a84c" }}>
-                    {rank===0?"👑":rank+1}
-                  </div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontWeight:700 }}>{p.name}</div>
-                    {rank===0&&<div style={{ fontFamily:"'Lato',sans-serif", fontSize:".74rem", color:"#c9a84c" }}>Grand Capitaine !</div>}
-                  </div>
-                  <div style={{ textAlign:"right" }}>
-                    <div style={{ fontSize:"1.35rem" }}><ScoreVal v={p.score} /></div>
-                    <div style={{ fontFamily:"'Lato',sans-serif", fontSize:".68rem", color:"#4a3f2a" }}>points</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            <div style={{ marginTop:16 }}>
-              <div onClick={()=>setShowHistory(h=>!h)} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", padding:"9px 13px", borderRadius:10, background:"rgba(201,168,76,.05)", border:"1px solid rgba(201,168,76,.13)" }}>
-                <span style={{ fontFamily:"'Lato',sans-serif", fontSize:".8rem", color:"#8a7a5a" }}>📋 Détail manche par manche</span>
-                <span style={{ color:"#c9a84c" }}>{showHistory?"▲":"▼"}</span>
-              </div>
-              {showHistory && <HistoryTable />}
-            </div>
-
-            <GoldBtn onClick={restartGame} style={{ width:"100%", marginTop:16, fontSize:"1rem", padding:14 }}>⚓ Nouvelle partie</GoldBtn>
-          </div>
-        )}
-      </div>
-
-      {showAddPlayer && (
-        <div className="sk-overlay" onClick={()=>setShowAddPlayer(false)}>
-          <div className="sk-modal sk-slide" onClick={e=>e.stopPropagation()}>
-            <h3 style={{ margin:"0 0 13px", color:"#c9a84c" }}>Ajouter un joueur</h3>
-            <div style={{ display:"flex", gap:9, marginBottom:11 }}>
-              <input value={extraName} onChange={e=>setExtraName(e.target.value)}
-                onKeyDown={e=>e.key==="Enter"&&addPlayerMidGame()} placeholder="Nom du joueur…" style={inputStyle} />
-            </div>
-            <p style={{ fontFamily:"'Lato',sans-serif", fontSize:".78rem", color:"#8a7a5a", marginBottom:15 }}>
-              Le joueur sera ajouté avec 0 point pour les manches déjà jouées.
-            </p>
-            <div style={{ display:"flex", gap:9 }}>
-              <GhostBtn onClick={()=>setShowAddPlayer(false)}>Annuler</GhostBtn>
-              <GoldBtn onClick={addPlayerMidGame} disabled={!extraName.trim()||players.length>=10} style={{ flex:1 }}>Ajouter</GoldBtn>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {editingPast !== null && (
-        <div className="sk-overlay" onClick={()=>setEditingPast(null)}>
-          <div className="sk-modal sk-slide" onClick={e=>e.stopPropagation()}>
-            <h3 style={{ margin:"0 0 4px", color:"#c9a84c" }}>Modifier — Manche {editingPast+1}</h3>
-            <p style={{ margin:"0 0 13px", fontFamily:"'Lato',sans-serif", fontSize:".78rem", color:"#8a7a5a" }}>
-              {editingPast+1} carte{editingPast>0?"s":""} · Modifiez annonces, plis et bonus ci-dessous
-            </p>
-            {players.map((_, pi) => (
-              <EntryCard key={pi} pi={pi}
-                entry={pastEntries[pi]||emptyEntry()}
-                entries={pastEntries} setEntries={setPastEntries}
-                roundNum={editingPast+1} showBid={true} showTricks={true} />
-            ))}
-            <div style={{ display:"flex", gap:9, marginTop:8 }}>
-              <GhostBtn onClick={()=>setEditingPast(null)}>Annuler</GhostBtn>
-              <GoldBtn onClick={savePastEdit} style={{ flex:1 }}>💾 Sauvegarder</GoldBtn>
-            </div>
-          </div>
-        </div>
-      )}
-      {showStats && (
-        <div className="sk-overlay" onClick={()=>setShowStats(false)}>
-          <div className="sk-modal sk-slide" onClick={e=>e.stopPropagation()}>
-            <h3 style={{ margin:"0 0 4px", color:"#c9a84c" }}>📊 Statistiques des joueurs</h3>
-            <p style={{ margin:"0 0 15px", fontFamily:"'Lato',sans-serif", fontSize:".78rem", color:"#8a7a5a" }}>
-              Basé sur les parties terminées (10 manches) sur cet appareil.
-            </p>
-            {(() => {
-              const stats = loadJSON(STORAGE_KEY_STATS, {});
-              const entries = Object.values(stats).sort((a,b) => b.wins - a.wins || b.totalScore - a.totalScore);
-              if (entries.length === 0) {
-                return <p style={{ textAlign:"center", color:"#4a3f2a", fontFamily:"'Lato',sans-serif", fontSize:".85rem", padding:"20px 0" }}>
-                  Aucune partie terminée pour l'instant.
-                </p>;
-              }
-              return (
-                <div style={{ overflowX:"auto" }}>
-                  <table style={{ width:"100%", borderCollapse:"collapse", fontFamily:"'Lato',sans-serif", fontSize:".82rem" }}>
-                    <thead>
-                      <tr>
-                        <th style={{ textAlign:"left", padding:"6px 8px", borderBottom:"1px solid rgba(201,168,76,.2)", color:"#8a7a5a" }}>Joueur</th>
-                        <th style={{ padding:"6px 8px", borderBottom:"1px solid rgba(201,168,76,.2)", color:"#8a7a5a" }}>Parties</th>
-                        <th style={{ padding:"6px 8px", borderBottom:"1px solid rgba(201,168,76,.2)", color:"#8a7a5a" }}>Victoires</th>
-                        <th style={{ padding:"6px 8px", borderBottom:"1px solid rgba(201,168,76,.2)", color:"#8a7a5a" }}>Score moy.</th>
-                        <th style={{ padding:"6px 8px", borderBottom:"1px solid rgba(201,168,76,.2)", color:"#8a7a5a" }}>Meilleur</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {entries.map(p => (
-                        <tr key={p.displayName} style={{ borderBottom:"1px solid rgba(201,168,76,.07)" }}>
-                          <td style={{ padding:"6px 8px", fontWeight:700, color:"#e8d5b0" }}>{p.displayName}</td>
-                          <td style={{ padding:"6px 8px", textAlign:"center" }}>{p.gamesPlayed}</td>
-                          <td style={{ padding:"6px 8px", textAlign:"center", color:"#c9a84c", fontWeight:700 }}>{p.wins} 👑</td>
-                          <td style={{ padding:"6px 8px", textAlign:"center" }}><ScoreVal v={Math.round(p.totalScore / p.gamesPlayed)} /></td>
-                          <td style={{ padding:"6px 8px", textAlign:"center" }}><ScoreVal v={p.bestScore} /></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              );
-            })()}
-            <div style={{ display:"flex", gap:9, marginTop:18 }}>
-              <GhostBtn onClick={()=>setShowStats(false)} style={{ flex:1 }}>Fermer</GhostBtn>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    // ══ MODAL stats ══
+    showStats && e('div', {className:'sk-overlay', onClick:()=>setShowStats(false)},
+      e('div', {className:'sk-modal', onClick:ev=>ev.stopPropagation()},
+        e('h3', {style:{margin:'0 0 4px', color:'#c9a84c'}}, '📊 Statistiques des joueurs'),
+        e('p', {style:{margin:'0 0 15px', fontFamily:"'Lato',sans-serif", fontSize:'.78rem', color:'#8a7a5a'}},
+          'Basé sur les parties terminées (10 manches) sur cet appareil.'
+        ),
+        (function() {
+          const stats = loadJSON(STORAGE_KEY_STATS, {});
+          const entries = Object.values(stats).sort((a,b) => b.wins-a.wins || b.totalScore-a.totalScore);
+          if (entries.length === 0) {
+            return e('p', {style:{textAlign:'center', color:'#4a3f2a', fontFamily:"'Lato',sans-serif", fontSize:'.85rem', padding:'20px 0'}},
+              'Aucune partie terminée pour l\'instant.'
+            );
+          }
+          return e('div', {style:{overflowX:'auto'}},
+            e('table', {style:{width:'100%', borderCollapse:'collapse', fontFamily:"'Lato',sans-serif", fontSize:'.82rem'}},
+              e('thead', null,
+                e('tr', null,
+                  ['Joueur','Parties','Victoires','Score moy.','Meilleur'].map((h,i) =>
+                    e('th', {key:i, style:{textAlign:i===0?'left':'center', padding:'6px 8px', borderBottom:'1px solid rgba(201,168,76,.2)', color:'#8a7a5a'}}, h)
+                  )
+                )
+              ),
+              e('tbody', null,
+                entries.map(p =>
+                  e('tr', {key:p.displayName, style:{borderBottom:'1px solid rgba(201,168,76,.07)'}},
+                    e('td', {style:{padding:'6px 8px', fontWeight:700, color:'#e8d5b0'}}, p.displayName),
+                    e('td', {style:{padding:'6px 8px', textAlign:'center'}}, p.gamesPlayed),
+                    e('td', {style:{padding:'6px 8px', textAlign:'center', color:'#c9a84c', fontWeight:700}}, p.wins+' 👑'),
+                    e('td', {style:{padding:'6px 8px', textAlign:'center'}}, e(ScoreVal, {v:Math.round(p.totalScore/p.gamesPlayed)})),
+                    e('td', {style:{padding:'6px 8px', textAlign:'center'}}, e(ScoreVal, {v:p.bestScore}))
+                  )
+                )
+              )
+            )
+          );
+        })(),
+        e('div', {style:{display:'flex', gap:9, marginTop:18}},
+          e(GhostBtn, {onClick:()=>setShowStats(false), style:{flex:1}}, 'Fermer')
+        )
+      )
+    )
   );
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<SkullKing />);
+root.render(React.createElement(SkullKing));
 </script>
 </body>
 </html>
