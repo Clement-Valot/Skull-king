@@ -22,8 +22,8 @@ html,body{margin:0;padding:0;background:#051020;font-family:'Cinzel','Georgia',s
 @keyframes skwave{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 .sk-skull{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:28vw;opacity:.025;z-index:0;pointer-events:none;user-select:none}
 .sk-card{background:rgba(5,16,32,.88);border:1px solid rgba(201,168,76,.3);border-radius:12px;backdrop-filter:blur(10px)}
-.sk-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:50;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto}
-.sk-modal{background:#051020;border:1px solid rgba(201,168,76,.5);border-radius:14px;padding:22px;width:100%;max-width:680px;max-height:88vh;overflow-y:auto;box-sizing:border-box}
+.sk-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto}
+.sk-modal{background:#051020;border:1px solid rgba(201,168,76,.5);border-radius:14px;padding:22px;width:100%;max-width:680px;margin:auto;box-sizing:border-box}
 .sk-rdot{width:9px;height:9px;border-radius:50%;background:#c9a84c;opacity:.2;flex-shrink:0;display:inline-block}
 .sk-rdot.done{opacity:1}.sk-rdot.current{opacity:1;box-shadow:0 0 8px #c9a84c}
 input[type=number]::-webkit-inner-spin-button{opacity:.4}
@@ -31,12 +31,13 @@ body{-webkit-tap-highlight-color:transparent;}
 .gold-btn{background:linear-gradient(135deg,#c9a84c,#8b6914);color:#000;border:none;border-radius:8px;padding:10px 20px;font-family:'Cinzel',serif;font-weight:700;cursor:pointer;letter-spacing:.05em;transition:all .2s;font-size:1rem}
 .gold-btn:disabled{background:rgba(139,105,20,.3);color:#666;cursor:not-allowed}
 .ghost-btn{background:transparent;border:1px solid rgba(201,168,76,.4);color:#c9a84c;border-radius:8px;padding:8px 16px;font-family:'Cinzel',serif;cursor:pointer;transition:all .2s;font-size:.9rem}
-.num-input{background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.4);color:#e8d5b0;border-radius:6px;padding:5px 8px;font-family:'Cinzel',serif;font-size:1rem;width:52px;text-align:center;outline:none}
+.num-input{background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.4);color:#e8d5b0;border-radius:6px;padding:5px 8px;font-family:'Cinzel',serif;font-size:1rem;width:58px;text-align:center;outline:none}
+.bonus-input{background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.4);color:#e8d5b0;border-radius:6px;padding:5px 8px;font-family:'Cinzel',serif;font-size:1rem;width:70px;text-align:center;outline:none}
 .text-input{flex:1;background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.4);color:#e8d5b0;border-radius:8px;padding:10px 13px;font-family:'Cinzel',serif;outline:none;font-size:1rem}
-.bonus-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;cursor:pointer;user-select:none;font-family:'Lato',sans-serif;font-size:.7rem;transition:all .15s;border:1px solid rgba(201,168,76,.3);background:transparent;color:#8a7a5a}
-.bonus-chip.active{border-color:#c9a84c;background:rgba(201,168,76,.22);color:#c9a84c}
-.counter-btn{background:rgba(201,168,76,.15);border:1px solid rgba(201,168,76,.3);color:#c9a84c;border-radius:4px;width:22px;height:22px;cursor:pointer;font-weight:700;font-size:1rem;line-height:1;padding:0}
 .suggestion-chip{padding:4px 11px;border-radius:20px;border:1px solid rgba(201,168,76,.3);background:rgba(201,168,76,.06);color:#c9a84c;font-family:'Lato',sans-serif;font-size:.78rem;cursor:pointer;user-select:none}
+.ref-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(201,168,76,.07);font-family:'Lato',sans-serif;font-size:.8rem}
+.ref-row:last-child{border-bottom:none}
+.ref-cat{color:#8a7a5a;font-size:.7rem;letter-spacing:.1em;margin:10px 0 4px;font-family:'Cinzel',serif}
 </style>
 </head>
 <body>
@@ -54,16 +55,21 @@ const STORAGE_KEY_PLAYERS = 'skullking_known_players';
 const STORAGE_KEY_STATS   = 'skullking_player_stats';
 
 const SEA_COLORS = ['#e63946','#2a9d8f','#e9c46a','#f4a261','#a8dadc','#457b9d','#6a4c93','#f77f00','#4cc9f0','#80b918'];
-const CAPTURE_BONUSES = [
-  {id:'mermaid_pirate', label:'Sirène ↔ Pirate', points:20},
-  {id:'skull_pirate',   label:'Skull King → Pirate', points:30},
-  {id:'mermaid_skull',  label:'Sirène → Skull King', points:40},
-];
-const CARD14_BONUSES = [
-  {id:'c14_black',  label:'14 Noir',   points:20, color:'#c8c8c8'},
-  {id:'c14_yellow', label:'14 Jaune',  points:10, color:'#e9c46a'},
-  {id:'c14_purple', label:'14 Violet', points:10, color:'#a78bfa'},
-  {id:'c14_red',    label:'14 Rouge',  points:10, color:'#f87171'},
+
+// Référentiel des bonus — affiché dans le panneau d'aide
+const BONUS_REF = [
+  { cat: 'JEU DE BASE' },
+  { label: '14 coloré (vert/jaune/violet) capturé', pts: '+10' },
+  { label: '14 noir (Jolly Roger) capturé', pts: '+20' },
+  { label: 'Pirate capturé par le Skull King', pts: '+30 par pirate' },
+  { label: 'Skull King capturé par une Sirène', pts: '+40' },
+  { label: 'Sirène capturée par un Pirate', pts: '+20 par sirène' },
+  { cat: 'EXTENSION' },
+  { label: '7 coloré (vert/jaune/violet) capturé', pts: '−5 par carte' },
+  { label: '8 coloré (vert/jaune/violet) capturé', pts: '+5 par carte' },
+  { label: 'Butin (Loot) : alliance réussie', pts: '+20' },
+  { label: 'First Mate Con capturé par Skull King ou Sirène', pts: '+30' },
+  { label: 'Coffre de Davy Jones : monstre marin tué', pts: '+20 par monstre' },
 ];
 
 function loadJSON(key, fallback) {
@@ -74,143 +80,144 @@ function saveJSON(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch(_) {}
 }
 function norm(name) { return name.trim().toLowerCase(); }
-function emptyEntry() { return {bid:null, tricks:null, bonuses:0, activeCapture:{}, activeCard14:{}}; }
+function emptyEntry() { return { bid: null, tricks: null, bonuses: 0 }; }
 
 function calcScore(bid, tricks, bonuses, roundNum) {
   if (bid === 0) { const b = roundNum * 10; return tricks === 0 ? b : -b; }
   if (tricks === bid) return bid * 20 + bonuses;
   return Math.abs(tricks - bid) * -10;
+  // Note: bonuses non comptés si annonce ratée (inclus dans la logique ci-dessus)
 }
 
-// ── Tiny helpers ──────────────────────────────────────────────────────────────
-function ScoreVal({v}) {
-  if (v === null || v === undefined) return e('span', {style:{color:'#4a3f2a'}}, '—');
-  return e('span', {style:{color: v>0?'#4ade80':v<0?'#f87171':'#8a7a5a', fontWeight:700}}, (v>0?'+':'')+v);
+// ── Helpers UI ────────────────────────────────────────────────────────────────
+function ScoreVal({ v }) {
+  if (v === null || v === undefined) return e('span', { style: { color: '#4a3f2a' } }, '—');
+  return e('span', { style: { color: v > 0 ? '#4ade80' : v < 0 ? '#f87171' : '#8a7a5a', fontWeight: 700 } }, (v > 0 ? '+' : '') + v);
 }
-function GoldBtn({onClick, disabled, children, style}) {
-  return e('button', {onClick, disabled, className:'gold-btn', style}, children);
+function GoldBtn({ onClick, disabled, children, style }) {
+  return e('button', { onClick, disabled, className: 'gold-btn', style }, children);
 }
-function GhostBtn({onClick, children, style}) {
-  return e('button', {onClick, className:'ghost-btn', style}, children);
+function GhostBtn({ onClick, children, style }) {
+  return e('button', { onClick, className: 'ghost-btn', style }, children);
 }
 
-// ── Entry card ────────────────────────────────────────────────────────────────
-function EntryCard({pi, entry, entries, setEntries, roundNum, showBid, showTricks, players, phase, totalScore}) {
-  const s = entry.bid !== null && entry.tricks !== null ? calcScore(entry.bid, entry.tricks, entry.bonuses, roundNum) : null;
+// ── Panneau référentiel des bonus ─────────────────────────────────────────────
+function BonusRef() {
+  return e('div', { style: { background: 'rgba(201,168,76,.05)', border: '1px solid rgba(201,168,76,.15)', borderRadius: 10, padding: '12px 14px' } },
+    BONUS_REF.map((row, i) => {
+      if (row.cat) return e('div', { key: i, className: 'ref-cat' }, row.cat);
+      return e('div', { key: i, className: 'ref-row' },
+        e('span', { style: { color: '#8a7a5a', flex: 1, paddingRight: 8 } }, row.label),
+        e('span', { style: { color: row.pts.startsWith('−') ? '#f87171' : '#4ade80', fontWeight: 700, whiteSpace: 'nowrap' } }, row.pts)
+      );
+    })
+  );
+}
 
-  function updateEntry(patch) {
+// ── Carte joueur ──────────────────────────────────────────────────────────────
+function EntryCard({ pi, entry, entries, setEntries, roundNum, showBid, showTricks, players, phase, totalScore }) {
+  const bidOk = entry.bid !== null;
+  const tricksOk = entry.tricks !== null;
+  const s = bidOk && tricksOk ? calcScore(entry.bid, entry.tricks, entry.bonuses, roundNum) : null;
+  const bonusDisabled = !tricksOk || entry.bid === null || (entry.tricks !== entry.bid && entry.bid !== 0) || (entry.bid === 0 && entry.tricks !== 0);
+  // bonus actifs seulement si annonce réussie
+  const bonusActive = tricksOk && bidOk && (entry.bid === 0 ? entry.tricks === 0 : entry.tricks === entry.bid);
+
+  function update(patch) {
     setEntries(entries.map((en, i) => i === pi ? Object.assign({}, en, patch) : en));
   }
-  function setBid(val) { updateEntry({bid: Math.max(0, Math.min(roundNum, parseInt(val)||0))}); }
-  function setTricks(val) { updateEntry({tricks: Math.max(0, Math.min(roundNum, parseInt(val)||0))}); }
-  function toggleCapture(b) {
-    const was = !!entry.activeCapture[b.id];
-    const newCapture = Object.assign({}, entry.activeCapture, {[b.id]: !was});
-    updateEntry({activeCapture: newCapture, bonuses: entry.bonuses + (was ? -b.points : b.points)});
-  }
-  function setCard14(b, count) {
-    const prev = entry.activeCard14[b.id] || 0;
-    const newCard14 = Object.assign({}, entry.activeCard14, {[b.id]: count});
-    updateEntry({activeCard14: newCard14, bonuses: entry.bonuses + (count - prev) * b.points});
+  function setBid(val) { update({ bid: Math.max(0, Math.min(roundNum, parseInt(val) || 0)) }); }
+  function setTricks(val) { update({ tricks: Math.max(0, Math.min(roundNum, parseInt(val) || 0)) }); }
+  function setBonuses(val) {
+    const n = parseInt(val);
+    update({ bonuses: isNaN(n) ? 0 : n });
   }
 
-  return e('div', {style:{padding:14, marginBottom:10, borderRadius:10, background:'rgba(5,16,32,.88)', border:'1px solid rgba(201,168,76,.28)', borderLeft:'3px solid '+SEA_COLORS[pi%SEA_COLORS.length]}},
+  return e('div', { style: { padding: 14, marginBottom: 10, borderRadius: 10, background: 'rgba(5,16,32,.88)', border: '1px solid rgba(201,168,76,.28)', borderLeft: '3px solid ' + SEA_COLORS[pi % SEA_COLORS.length] } },
     // Header
-    e('div', {style:{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10}},
-      e('div', {style:{display:'flex', alignItems:'center', gap:8}},
-        e('div', {style:{width:8, height:8, borderRadius:'50%', background:SEA_COLORS[pi%SEA_COLORS.length]}}),
-        e('span', {style:{fontWeight:700, fontFamily:"'Cinzel',serif", color:'#e8d5b0'}}, players[pi])
+    e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 } },
+      e('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+        e('div', { style: { width: 8, height: 8, borderRadius: '50%', background: SEA_COLORS[pi % SEA_COLORS.length] } }),
+        e('span', { style: { fontWeight: 700, fontFamily: "'Cinzel',serif", color: '#e8d5b0' } }, players[pi])
       ),
-      phase === 'playing' && e('span', {style:{fontFamily:"'Lato',sans-serif", fontSize:'.78rem', color:'#8a7a5a'}},
-        'Total : ', e(ScoreVal, {v: totalScore(pi)})
+      phase === 'playing' && e('span', { style: { fontFamily: "'Lato',sans-serif", fontSize: '.78rem', color: '#8a7a5a' } },
+        'Total : ', e(ScoreVal, { v: totalScore(pi) })
       )
     ),
-    // Bid / tricks
-    e('div', {style:{display:'flex', flexWrap:'wrap', gap:12, marginBottom:10, alignItems:'center'}},
-      showBid && e('label', {style:{display:'flex', alignItems:'center', gap:7, fontFamily:"'Lato',sans-serif", fontSize:'.83rem', color:'#8a7a5a'}},
+    // Annonce + Plis
+    e('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 10, alignItems: 'center' } },
+      showBid && e('label', { style: { display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Lato',sans-serif", fontSize: '.83rem', color: '#8a7a5a' } },
         'Annonce :',
-        e('input', {type:'number', className:'num-input', min:0, max:roundNum, value: entry.bid === null ? '' : entry.bid,
-          onChange: ev => setBid(ev.target.value)})
+        e('input', { type: 'number', className: 'num-input', min: 0, max: roundNum, value: entry.bid === null ? '' : entry.bid, onChange: ev => setBid(ev.target.value) })
       ),
-      !showBid && entry.bid !== null && e('span', {style:{fontFamily:"'Lato',sans-serif", fontSize:'.83rem', color:'#8a7a5a'}},
-        'Annonce : ', e('strong', {style:{color:'#c9a84c'}}, entry.bid)
+      !showBid && bidOk && e('span', { style: { fontFamily: "'Lato',sans-serif", fontSize: '.83rem', color: '#8a7a5a' } },
+        'Annonce : ', e('strong', { style: { color: '#c9a84c' } }, entry.bid)
       ),
-      showTricks && e('label', {style:{display:'flex', alignItems:'center', gap:7, fontFamily:"'Lato',sans-serif", fontSize:'.83rem', color:'#8a7a5a'}},
+      showTricks && e('label', { style: { display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Lato',sans-serif", fontSize: '.83rem', color: '#8a7a5a' } },
         'Plis :',
-        e('input', {type:'number', className:'num-input', min:0, max:roundNum, value: entry.tricks === null ? '' : entry.tricks,
-          onChange: ev => setTricks(ev.target.value)})
+        e('input', { type: 'number', className: 'num-input', min: 0, max: roundNum, value: entry.tricks === null ? '' : entry.tricks, onChange: ev => setTricks(ev.target.value) })
       )
     ),
-    // Bonuses (only in tricks phase or edit mode)
-    (showTricks || !showBid) && e('div', null,
-      // Capture bonuses
-      e('div', {style:{display:'flex', flexWrap:'wrap', gap:5, marginBottom:6}},
-        CAPTURE_BONUSES.map(b => {
-          const active = !!entry.activeCapture[b.id];
-          return e('div', {key:b.id, className:'bonus-chip'+(active?' active':''), onClick:()=>toggleCapture(b)},
-            active?'✓':'+', ' ', b.label, ' ', e('strong', {style:{color:'#c9a84c'}}, '+'+b.points)
-          );
-        })
-      ),
-      // Card 14 bonuses
-      e('div', {style:{display:'flex', flexWrap:'wrap', gap:5, marginBottom:8}},
-        CARD14_BONUSES.map(b => {
-          const count = entry.activeCard14[b.id] || 0;
-          return e('div', {key:b.id, style:{display:'inline-flex', alignItems:'center', gap:4, padding:'3px 8px', borderRadius:20, border:'1px solid rgba(201,168,76,.22)', fontFamily:"'Lato',sans-serif", fontSize:'.7rem', background:'rgba(5,16,32,.6)'}},
-            e('span', {style:{color:b.color}}, '■'),
-            e('span', {style:{color:'#8a7a5a'}}, b.label),
-            e('span', {style:{color:'#c9a84c', fontWeight:700}}, '+'+b.points),
-            e('button', {className:'counter-btn', onClick:()=>setCard14(b, Math.max(0,count-1))}, '−'),
-            e('span', {style:{color:'#e8d5b0', minWidth:14, textAlign:'center'}}, count),
-            e('button', {className:'counter-btn', onClick:()=>setCard14(b, count+1)}, '+')
-          );
-        })
+    // Bonus (phase résultats uniquement)
+    (showTricks || !showBid) && e('div', { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 } },
+      e('label', { style: { fontFamily: "'Lato',sans-serif", fontSize: '.83rem', color: bonusActive ? '#8a7a5a' : '#4a3f2a', display: 'flex', alignItems: 'center', gap: 8 } },
+        'Bonus :',
+        e('input', {
+          type: 'number',
+          className: 'bonus-input',
+          value: entry.bonuses === 0 ? '' : entry.bonuses,
+          placeholder: '0',
+          disabled: !bonusActive,
+          onChange: ev => setBonuses(ev.target.value),
+          style: { opacity: bonusActive ? 1 : 0.35 }
+        }),
+        e('span', { style: { fontSize: '.72rem', color: '#4a3f2a' } }, bonusActive ? 'pts (voir référentiel ↓)' : '— annonce ratée')
       )
     ),
-    // Round score
-    s !== null && e('div', {style:{textAlign:'right', fontFamily:"'Lato',sans-serif", fontSize:'.82rem', marginTop:8}},
-      'Ce tour : ', e(ScoreVal, {v:s})
+    // Score du tour
+    s !== null && e('div', { style: { textAlign: 'right', fontFamily: "'Lato',sans-serif", fontSize: '.82rem', marginTop: 4 } },
+      'Ce tour : ', e(ScoreVal, { v: s })
     )
   );
 }
 
-// ── History table ─────────────────────────────────────────────────────────────
-function HistoryTable({rounds, players, onEdit}) {
-  function totalScore(pi) {
+// ── Tableau historique ────────────────────────────────────────────────────────
+function HistoryTable({ rounds, players, onEdit }) {
+  function total(pi) {
     return rounds.reduce((sum, round, ri) => {
       const en = round[pi];
-      if (!en || en.bid===null || en.tricks===null) return sum;
-      return sum + calcScore(en.bid, en.tricks, en.bonuses, ri+1);
+      if (!en || en.bid === null || en.tricks === null) return sum;
+      return sum + calcScore(en.bid, en.tricks, en.bonuses, ri + 1);
     }, 0);
   }
-  return e('div', {style:{overflowX:'auto', padding:12, marginTop:8, borderRadius:10, background:'rgba(5,16,32,.88)', border:'1px solid rgba(201,168,76,.28)'}},
-    e('table', {style:{width:'100%', borderCollapse:'collapse', fontFamily:"'Lato',sans-serif", fontSize:'.75rem'}},
+  return e('div', { style: { overflowX: 'auto', padding: 12, marginTop: 8, borderRadius: 10, background: 'rgba(5,16,32,.88)', border: '1px solid rgba(201,168,76,.28)' } },
+    e('table', { style: { width: '100%', borderCollapse: 'collapse', fontFamily: "'Lato',sans-serif", fontSize: '.75rem' } },
       e('thead', null,
         e('tr', null,
-          e('th', {style:{color:'#4a3f2a', textAlign:'left', padding:'4px 6px', borderBottom:'1px solid rgba(201,168,76,.2)'}}, 'M.'),
-          players.map((p,i) => e('th', {key:i, style:{color:SEA_COLORS[i%SEA_COLORS.length], padding:'4px 5px', borderBottom:'1px solid rgba(201,168,76,.2)', textAlign:'center'}}, p)),
-          e('th', {style:{borderBottom:'1px solid rgba(201,168,76,.2)', width:30}})
+          e('th', { style: { color: '#4a3f2a', textAlign: 'left', padding: '4px 6px', borderBottom: '1px solid rgba(201,168,76,.2)' } }, 'M.'),
+          players.map((p, i) => e('th', { key: i, style: { color: SEA_COLORS[i % SEA_COLORS.length], padding: '4px 5px', borderBottom: '1px solid rgba(201,168,76,.2)', textAlign: 'center' } }, p)),
+          e('th', { style: { borderBottom: '1px solid rgba(201,168,76,.2)', width: 30 } })
         )
       ),
       e('tbody', null,
         rounds.map((round, ri) =>
-          e('tr', {key:ri, style:{borderBottom:'1px solid rgba(201,168,76,.07)'}},
-            e('td', {style:{padding:'4px 6px', color:'#c9a84c', fontWeight:700}}, ri+1),
+          e('tr', { key: ri, style: { borderBottom: '1px solid rgba(201,168,76,.07)' } },
+            e('td', { style: { padding: '4px 6px', color: '#c9a84c', fontWeight: 700 } }, ri + 1),
             round.map((en, pi) => {
-              const s = en.bid!==null&&en.tricks!==null ? calcScore(en.bid,en.tricks,en.bonuses,ri+1) : null;
-              return e('td', {key:pi, style:{padding:'4px 5px', textAlign:'center'}},
-                e(ScoreVal, {v:s}),
-                s!==null && e('span', {style:{color:'#4a3f2a', marginLeft:2, fontSize:'.68rem'}}, '('+en.bid+'/'+en.tricks+')')
+              const s = en.bid !== null && en.tricks !== null ? calcScore(en.bid, en.tricks, en.bonuses, ri + 1) : null;
+              return e('td', { key: pi, style: { padding: '4px 5px', textAlign: 'center' } },
+                e(ScoreVal, { v: s }),
+                s !== null && e('span', { style: { color: '#4a3f2a', marginLeft: 2, fontSize: '.65rem' } }, '(' + en.bid + '/' + en.tricks + (en.bonuses ? '/+' + en.bonuses + 'b' : '') + ')')
               );
             }),
-            e('td', {style:{padding:'4px 5px'}},
-              e('button', {onClick:()=>onEdit(ri), style:{background:'transparent', border:'1px solid rgba(201,168,76,.35)', color:'#c9a84c', borderRadius:6, padding:'1px 5px', cursor:'pointer', fontSize:'.68rem', fontFamily:"'Cinzel',serif"}}, '✏️')
+            e('td', { style: { padding: '4px 5px' } },
+              e('button', { onClick: () => onEdit(ri), style: { background: 'transparent', border: '1px solid rgba(201,168,76,.35)', color: '#c9a84c', borderRadius: 6, padding: '1px 5px', cursor: 'pointer', fontSize: '.68rem', fontFamily: "'Cinzel',serif" } }, '✏️')
             )
           )
         ),
-        rounds.length > 0 && e('tr', {key:'total', style:{borderTop:'2px solid rgba(201,168,76,.3)'}},
-          e('td', {style:{padding:'4px 6px', color:'#8a7a5a', fontSize:'.7rem', fontFamily:"'Cinzel',serif"}}, 'TOTAL'),
-          players.map((_,pi) => e('td', {key:pi, style:{padding:'4px 5px', textAlign:'center'}}, e(ScoreVal, {v:totalScore(pi)}))),
+        rounds.length > 0 && e('tr', { key: 'total', style: { borderTop: '2px solid rgba(201,168,76,.3)' } },
+          e('td', { style: { padding: '4px 6px', color: '#8a7a5a', fontSize: '.7rem', fontFamily: "'Cinzel',serif" } }, 'TOTAL'),
+          players.map((_, pi) => e('td', { key: pi, style: { padding: '4px 5px', textAlign: 'center' } }, e(ScoreVal, { v: total(pi) }))),
           e('td')
         )
       )
@@ -218,35 +225,36 @@ function HistoryTable({rounds, players, onEdit}) {
   );
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+// ── Composant principal ───────────────────────────────────────────────────────
 function SkullKing() {
-  const savedGame = loadJSON(STORAGE_KEY_GAME, null);
+  const saved = loadJSON(STORAGE_KEY_GAME, null);
 
-  const [players, setPlayers]           = useState(savedGame && savedGame.players || []);
-  const [nameInput, setNameInput]       = useState('');
-  const [phase, setPhase]               = useState(savedGame && savedGame.phase || 'setup');
-  const [rounds, setRounds]             = useState(savedGame && savedGame.rounds || []);
-  const [currentRound, setCurrentRound] = useState(savedGame && savedGame.currentRound || 1);
-  const [bidPhase, setBidPhase]         = useState(savedGame ? savedGame.bidPhase : true);
-  const [currentEntries, setCurrentEntries] = useState(savedGame && savedGame.currentEntries || []);
-  const [editingPast, setEditingPast]   = useState(null);
-  const [pastEntries, setPastEntries]   = useState([]);
-  const [showHistory, setShowHistory]   = useState(false);
-  const [showAddPlayer, setShowAddPlayer] = useState(false);
-  const [extraName, setExtraName]       = useState('');
-  const [knownPlayers, setKnownPlayers] = useState(() => loadJSON(STORAGE_KEY_PLAYERS, []));
+  const [players, setPlayers]               = useState(saved && saved.players || []);
+  const [nameInput, setNameInput]           = useState('');
+  const [phase, setPhase]                   = useState(saved && saved.phase || 'setup');
+  const [rounds, setRounds]                 = useState(saved && saved.rounds || []);
+  const [currentRound, setCurrentRound]     = useState(saved && saved.currentRound || 1);
+  const [bidPhase, setBidPhase]             = useState(saved ? saved.bidPhase : true);
+  const [currentEntries, setCurrentEntries] = useState(saved && saved.currentEntries || []);
+  const [editingPast, setEditingPast]       = useState(null);
+  const [pastEntries, setPastEntries]       = useState([]);
+  const [showHistory, setShowHistory]       = useState(false);
+  const [showAddPlayer, setShowAddPlayer]   = useState(false);
+  const [extraName, setExtraName]           = useState('');
+  const [knownPlayers, setKnownPlayers]     = useState(() => loadJSON(STORAGE_KEY_PLAYERS, []));
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [showStats, setShowStats]       = useState(false);
+  const [showStats, setShowStats]           = useState(false);
+  const [showRef, setShowRef]               = useState(false);
 
   useEffect(() => {
-    saveJSON(STORAGE_KEY_GAME, {players, phase, rounds, currentRound, bidPhase, currentEntries});
+    saveJSON(STORAGE_KEY_GAME, { players, phase, rounds, currentRound, bidPhase, currentEntries });
   }, [players, phase, rounds, currentRound, bidPhase, currentEntries]);
 
   function totalScore(pi) {
     return rounds.reduce((sum, round, ri) => {
       const en = round[pi];
-      if (!en || en.bid===null || en.tricks===null) return sum;
-      return sum + calcScore(en.bid, en.tricks, en.bonuses, ri+1);
+      if (!en || en.bid === null || en.tricks === null) return sum;
+      return sum + calcScore(en.bid, en.tricks, en.bonuses, ri + 1);
     }, 0);
   }
 
@@ -255,7 +263,7 @@ function SkullKing() {
       const merged = prev.slice();
       names.forEach(n => {
         const t = n.trim();
-        if (t && !merged.some(m => norm(m)===norm(t))) merged.push(t);
+        if (t && !merged.some(m => norm(m) === norm(t))) merged.push(t);
       });
       saveJSON(STORAGE_KEY_PLAYERS, merged);
       return merged;
@@ -308,20 +316,20 @@ function SkullKing() {
         name,
         score: newRounds.reduce((sum, round, ri) => {
           const en = round[pi];
-          if (!en || en.bid===null || en.tricks===null) return sum;
-          return sum + calcScore(en.bid, en.tricks, en.bonuses, ri+1);
+          if (!en || en.bid === null || en.tricks === null) return sum;
+          return sum + calcScore(en.bid, en.tricks, en.bonuses, ri + 1);
         }, 0)
       }));
       const stats = loadJSON(STORAGE_KEY_STATS, {});
-      const winnerScore = Math.max.apply(null, finalScores.map(p => p.score));
-      finalScores.forEach(function(fp) {
+      const best = Math.max.apply(null, finalScores.map(p => p.score));
+      finalScores.forEach(function (fp) {
         const key = norm(fp.name);
-        if (!stats[key]) stats[key] = {displayName:fp.name, gamesPlayed:0, wins:0, totalScore:0, bestScore:-99999};
+        if (!stats[key]) stats[key] = { displayName: fp.name, gamesPlayed: 0, wins: 0, totalScore: 0, bestScore: -99999 };
         stats[key].displayName = fp.name;
         stats[key].gamesPlayed += 1;
         stats[key].totalScore += fp.score;
         if (fp.score > stats[key].bestScore) stats[key].bestScore = fp.score;
-        if (fp.score === winnerScore) stats[key].wins += 1;
+        if (fp.score === best) stats[key].wins += 1;
       });
       saveJSON(STORAGE_KEY_STATS, stats);
     } else {
@@ -331,11 +339,7 @@ function SkullKing() {
     }
   }
 
-  function openPastEdit(ri) {
-    setEditingPast(ri);
-    setPastEntries(rounds[ri].map(en => Object.assign({}, en)));
-  }
-
+  function openPastEdit(ri) { setEditingPast(ri); setPastEntries(rounds[ri].map(en => Object.assign({}, en))); }
   function savePastEdit() {
     setRounds(rs => rs.map((r, ri) => ri === editingPast ? pastEntries.map(en => Object.assign({}, en)) : r));
     setEditingPast(null);
@@ -347,245 +351,213 @@ function SkullKing() {
     localStorage.removeItem(STORAGE_KEY_GAME);
   }
 
-  const sortedResults = players.map((name, i) => ({name, score:totalScore(i), color:SEA_COLORS[i%SEA_COLORS.length]}))
-    .sort((a,b) => b.score - a.score);
-
-  const entryCardProps = {players, phase, totalScore};
-
-  // ── Phase filtering for suggestions
-  const suggestions = knownPlayers.filter(kp =>
-    !players.some(p => norm(p)===norm(kp)) &&
-    (!nameInput.trim() || norm(kp).includes(norm(nameInput)))
-  );
+  const sortedResults = players.map((name, i) => ({ name, score: totalScore(i), color: SEA_COLORS[i % SEA_COLORS.length] })).sort((a, b) => b.score - a.score);
+  const suggestions = knownPlayers.filter(kp => !players.some(p => norm(p) === norm(kp)) && (!nameInput.trim() || norm(kp).includes(norm(nameInput))));
+  const cardProps = { players, phase, totalScore };
 
   // ── Render ────────────────────────────────────────────────────────────────
-  return e('div', {style:{minHeight:'100vh', background:'radial-gradient(ellipse at 60% 0%,#0d2137 0%,#051020 60%,#000 100%)', position:'relative', overflow:'hidden'}},
-    e('div', {className:'sk-skull'}, '💀'),
-    e('div', {className:'sk-wave'}),
-    e('div', {className:'sk-wave sk-wave2'}),
+  return e('div', { style: { minHeight: '100vh', background: 'radial-gradient(ellipse at 60% 0%,#0d2137 0%,#051020 60%,#000 100%)', position: 'relative', overflow: 'hidden' } },
+    e('div', { className: 'sk-skull' }, '💀'),
+    e('div', { className: 'sk-wave' }),
+    e('div', { className: 'sk-wave sk-wave2' }),
 
-    e('div', {style:{position:'relative', zIndex:1, maxWidth:700, margin:'0 auto', padding:'20px 13px 90px'}},
+    e('div', { style: { position: 'relative', zIndex: 1, maxWidth: 700, margin: '0 auto', padding: '20px 13px 90px' } },
 
       // Header
-      e('div', {style:{textAlign:'center', marginBottom:24}},
-        e('div', {style:{fontSize:'2.2rem', marginBottom:2}}, '💀'),
-        e('h1', {style:{margin:0, fontSize:'1.85rem', fontWeight:900, letterSpacing:'.08em', color:'#c9a84c', textShadow:'0 0 28px rgba(201,168,76,.5)'}}, 'SKULL KING'),
-        e('p', {style:{margin:'3px 0 0', fontFamily:"'Lato',sans-serif", color:'#8a7a5a', fontSize:'.75rem', letterSpacing:'.22em'}}, 'COMPTEUR DE POINTS')
+      e('div', { style: { textAlign: 'center', marginBottom: 24 } },
+        e('div', { style: { fontSize: '2.2rem', marginBottom: 2 } }, '💀'),
+        e('h1', { style: { margin: 0, fontSize: '1.85rem', fontWeight: 900, letterSpacing: '.08em', color: '#c9a84c', textShadow: '0 0 28px rgba(201,168,76,.5)' } }, 'SKULL KING'),
+        e('p', { style: { margin: '3px 0 0', fontFamily: "'Lato',sans-serif", color: '#8a7a5a', fontSize: '.75rem', letterSpacing: '.22em' } }, 'COMPTEUR DE POINTS')
       ),
 
       // ══ SETUP ══
-      phase === 'setup' && e('div', {className:'sk-card', style:{padding:24}},
-        e('div', {style:{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:15}},
-          e('h2', {style:{margin:0, fontSize:'1rem', color:'#c9a84c', letterSpacing:'.1em'}}, 'Joueurs ('+players.length+'/10)'),
-          e(GhostBtn, {onClick:()=>setShowStats(true), style:{fontSize:'.72rem', padding:'5px 11px'}}, '📊 Statistiques')
+      phase === 'setup' && e('div', { className: 'sk-card', style: { padding: 24 } },
+        e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 } },
+          e('h2', { style: { margin: 0, fontSize: '1rem', color: '#c9a84c', letterSpacing: '.1em' } }, 'Joueurs (' + players.length + '/10)'),
+          e('div', { style: { display: 'flex', gap: 8 } },
+            e(GhostBtn, { onClick: () => setShowRef(true), style: { fontSize: '.72rem', padding: '5px 11px' } }, '📋 Bonus'),
+            e(GhostBtn, { onClick: () => setShowStats(true), style: { fontSize: '.72rem', padding: '5px 11px' } }, '📊 Stats')
+          )
         ),
-        e('div', {style:{display:'flex', gap:9, marginBottom:10}},
-          e('input', {className:'text-input', value:nameInput, placeholder:'Nom du joueur…',
-            onChange:ev=>setNameInput(ev.target.value),
-            onFocus:()=>setShowSuggestions(true),
-            onKeyDown:ev=>ev.key==='Enter'&&addPlayer()}),
-          e(GoldBtn, {onClick:addPlayer, disabled:!nameInput.trim()||players.length>=10}, '+')
+        e('div', { style: { display: 'flex', gap: 9, marginBottom: 10 } },
+          e('input', { className: 'text-input', value: nameInput, placeholder: 'Nom du joueur…', onChange: ev => setNameInput(ev.target.value), onFocus: () => setShowSuggestions(true), onKeyDown: ev => ev.key === 'Enter' && addPlayer() }),
+          e(GoldBtn, { onClick: addPlayer, disabled: !nameInput.trim() || players.length >= 10 }, '+')
         ),
-        showSuggestions && suggestions.length > 0 && e('div', {style:{display:'flex', flexWrap:'wrap', gap:6, marginBottom:15}},
-          suggestions.map(kp => e('div', {key:kp, className:'suggestion-chip',
-            onClick:()=>{setPlayers(p=>p.concat(kp)); setNameInput('');}}, '+ '+kp))
+        showSuggestions && suggestions.length > 0 && e('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 15 } },
+          suggestions.map(kp => e('div', { key: kp, className: 'suggestion-chip', onClick: () => { setPlayers(p => p.concat(kp)); setNameInput(''); } }, '+ ' + kp))
         ),
-        e('div', {style:{display:'flex', flexDirection:'column', gap:7, minHeight:44, marginBottom:20}},
+        e('div', { style: { display: 'flex', flexDirection: 'column', gap: 7, minHeight: 44, marginBottom: 20 } },
           players.length === 0
-            ? e('p', {style:{color:'#4a3f2a', fontFamily:"'Lato',sans-serif", fontSize:'.85rem', textAlign:'center', margin:'auto'}}, 'Ajoutez au moins 2 joueurs')
-            : players.map((p,i) => e('div', {key:i, style:{display:'flex', alignItems:'center', gap:8, padding:'8px 13px', borderRadius:8, background:'rgba(201,168,76,.08)', border:'1px solid rgba(201,168,76,.2)'}},
-                e('div', {style:{width:9, height:9, borderRadius:'50%', background:SEA_COLORS[i%SEA_COLORS.length], flexShrink:0}}),
-                e('span', {style:{flex:1, fontFamily:"'Lato',sans-serif"}}, p),
-                e('button', {onClick:()=>setPlayers(ps=>ps.filter((_,idx)=>idx!==i)),
-                  style:{background:'none', border:'none', color:'#f87171', cursor:'pointer', fontSize:'1.1rem', padding:'0 3px'}}, '×')
-              ))
+            ? e('p', { style: { color: '#4a3f2a', fontFamily: "'Lato',sans-serif", fontSize: '.85rem', textAlign: 'center', margin: 'auto' } }, 'Ajoutez au moins 2 joueurs')
+            : players.map((p, i) => e('div', { key: i, style: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 13px', borderRadius: 8, background: 'rgba(201,168,76,.08)', border: '1px solid rgba(201,168,76,.2)' } },
+              e('div', { style: { width: 9, height: 9, borderRadius: '50%', background: SEA_COLORS[i % SEA_COLORS.length], flexShrink: 0 } }),
+              e('span', { style: { flex: 1, fontFamily: "'Lato',sans-serif" } }, p),
+              e('button', { onClick: () => setPlayers(ps => ps.filter((_, idx) => idx !== i)), style: { background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: '1.1rem', padding: '0 3px' } }, '×')
+            ))
         ),
-        e(GoldBtn, {onClick:startGame, disabled:players.length<2, style:{width:'100%', fontSize:'1rem', padding:13}}, '⚓ Commencer la partie')
+        e(GoldBtn, { onClick: startGame, disabled: players.length < 2, style: { width: '100%', fontSize: '1rem', padding: 13 } }, '⚓ Commencer la partie')
       ),
 
       // ══ PLAYING ══
       phase === 'playing' && e('div', null,
-        // Progress dots
-        e('div', {style:{display:'flex', justifyContent:'center', gap:5, marginBottom:15, flexWrap:'wrap'}},
-          Array.from({length:MAX_ROUNDS}, (_,i) =>
-            e('div', {key:i, className:'sk-rdot'+(i+1<currentRound?' done':i+1===currentRound?' current':''), title:'Manche '+(i+1)})
-          )
+        e('div', { style: { display: 'flex', justifyContent: 'center', gap: 5, marginBottom: 15, flexWrap: 'wrap' } },
+          Array.from({ length: MAX_ROUNDS }, (_, i) => e('div', { key: i, className: 'sk-rdot' + (i + 1 < currentRound ? ' done' : i + 1 === currentRound ? ' current' : ''), title: 'Manche ' + (i + 1) }))
         ),
-        // Round header
-        e('div', {className:'sk-card', style:{padding:16, marginBottom:11}},
-          e('div', {style:{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}},
+        e('div', { className: 'sk-card', style: { padding: 16, marginBottom: 11 } },
+          e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' } },
             e('div', null,
-              e('p', {style:{margin:0, fontFamily:"'Lato',sans-serif", color:'#8a7a5a', fontSize:'.7rem', letterSpacing:'.15em'}}, 'MANCHE'),
-              e('p', {style:{margin:0, fontSize:'1.6rem', fontWeight:900, color:'#c9a84c', lineHeight:1}},
-                currentRound, e('span', {style:{fontSize:'.82rem', color:'#4a3f2a'}}, ' / '+MAX_ROUNDS)
+              e('p', { style: { margin: 0, fontFamily: "'Lato',sans-serif", color: '#8a7a5a', fontSize: '.7rem', letterSpacing: '.15em' } }, 'MANCHE'),
+              e('p', { style: { margin: 0, fontSize: '1.6rem', fontWeight: 900, color: '#c9a84c', lineHeight: 1 } },
+                currentRound, e('span', { style: { fontSize: '.82rem', color: '#4a3f2a' } }, ' / ' + MAX_ROUNDS)
               )
             ),
-            e('div', {style:{display:'flex', gap:8, alignItems:'center'}},
-              e(GhostBtn, {onClick:()=>setShowAddPlayer(true), style:{fontSize:'.7rem', padding:'5px 9px'}}, '+ Joueur'),
-              e('div', {style:{textAlign:'right'}},
-                e('p', {style:{margin:0, fontFamily:"'Lato',sans-serif", color:'#8a7a5a', fontSize:'.7rem', letterSpacing:'.15em'}}, 'CARTES'),
-                e('p', {style:{margin:0, fontSize:'1.6rem', fontWeight:900, color:'#c9a84c', lineHeight:1}}, currentRound)
+            e('div', { style: { display: 'flex', gap: 8, alignItems: 'center' } },
+              e(GhostBtn, { onClick: () => setShowRef(true), style: { fontSize: '.7rem', padding: '5px 9px' } }, '📋 Bonus'),
+              e(GhostBtn, { onClick: () => setShowAddPlayer(true), style: { fontSize: '.7rem', padding: '5px 9px' } }, '+ Joueur'),
+              e('div', { style: { textAlign: 'right' } },
+                e('p', { style: { margin: 0, fontFamily: "'Lato',sans-serif", color: '#8a7a5a', fontSize: '.7rem', letterSpacing: '.15em' } }, 'CARTES'),
+                e('p', { style: { margin: 0, fontSize: '1.6rem', fontWeight: 900, color: '#c9a84c', lineHeight: 1 } }, currentRound)
               )
             )
           ),
-          e('div', {style:{textAlign:'center', marginTop:9}},
-            e('span', {style:{display:'inline-block', padding:'3px 13px', borderRadius:20,
-              background: bidPhase?'rgba(201,168,76,.17)':'rgba(74,222,128,.11)',
-              border: '1px solid '+(bidPhase?'rgba(201,168,76,.5)':'rgba(74,222,128,.4)'),
-              color: bidPhase?'#c9a84c':'#4ade80', fontFamily:"'Lato',sans-serif", fontSize:'.74rem'}},
+          e('div', { style: { textAlign: 'center', marginTop: 9 } },
+            e('span', { style: { display: 'inline-block', padding: '3px 13px', borderRadius: 20, background: bidPhase ? 'rgba(201,168,76,.17)' : 'rgba(74,222,128,.11)', border: '1px solid ' + (bidPhase ? 'rgba(201,168,76,.5)' : 'rgba(74,222,128,.4)'), color: bidPhase ? '#c9a84c' : '#4ade80', fontFamily: "'Lato',sans-serif", fontSize: '.74rem' } },
               bidPhase ? '📋 Phase d\'annonces' : '🃏 Phase de résultats'
             )
           ),
-          e('div', {style:{textAlign:'center', marginTop:8}},
-            e('span', {onClick:()=>{ if(window.confirm('Abandonner la partie en cours ?')) restartGame(); },
-              style:{fontFamily:"'Lato',sans-serif", fontSize:'.7rem', color:'#4a3f2a', cursor:'pointer', textDecoration:'underline'}},
-              'Abandonner la partie'
-            )
+          e('div', { style: { textAlign: 'center', marginTop: 8 } },
+            e('span', { onClick: () => { if (window.confirm('Abandonner la partie en cours ?')) restartGame(); }, style: { fontFamily: "'Lato',sans-serif", fontSize: '.7rem', color: '#4a3f2a', cursor: 'pointer', textDecoration: 'underline' } }, 'Abandonner la partie')
           )
         ),
-        // Player entry cards
-        players.map((_, pi) => e(EntryCard, Object.assign({key:pi, pi, entry:currentEntries[pi]||emptyEntry(), entries:currentEntries, setEntries:setCurrentEntries, roundNum:currentRound, showBid:bidPhase, showTricks:!bidPhase}, entryCardProps))),
-        // Action buttons
-        e('div', {style:{display:'flex', gap:9, marginTop:4}},
+        players.map((_, pi) => e(EntryCard, Object.assign({ key: pi, pi, entry: currentEntries[pi] || emptyEntry(), entries: currentEntries, setEntries: setCurrentEntries, roundNum: currentRound, showBid: bidPhase, showTricks: !bidPhase }, cardProps))),
+        e('div', { style: { display: 'flex', gap: 9, marginTop: 4 } },
           bidPhase
-            ? e(GoldBtn, {onClick:submitBids, disabled:currentEntries.some(en=>en.bid===null), style:{flex:1}}, 'Valider les annonces →')
+            ? e(GoldBtn, { onClick: submitBids, disabled: currentEntries.some(en => en.bid === null), style: { flex: 1 } }, 'Valider les annonces →')
             : e(React.Fragment, null,
-                e(GhostBtn, {onClick:()=>setBidPhase(true)}, '← Annonces'),
-                e(GoldBtn, {onClick:submitRound, disabled:currentEntries.some(en=>en.tricks===null), style:{flex:1}},
-                  currentRound < MAX_ROUNDS ? 'Manche suivante →' : '🏴‍☠️ Fin de partie'
-                )
-              )
+              e(GhostBtn, { onClick: () => setBidPhase(true) }, '← Annonces'),
+              e(GoldBtn, { onClick: submitRound, disabled: currentEntries.some(en => en.tricks === null), style: { flex: 1 } }, currentRound < MAX_ROUNDS ? 'Manche suivante →' : '🏴‍☠️ Fin de partie')
+            )
         ),
-        // History accordion
-        e('div', {style:{marginTop:18}},
-          e('div', {onClick:()=>setShowHistory(h=>!h), style:{display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'9px 13px', borderRadius:10, background:'rgba(201,168,76,.05)', border:'1px solid rgba(201,168,76,.13)'}},
-            e('span', {style:{fontFamily:"'Lato',sans-serif", fontSize:'.8rem', color:'#8a7a5a'}},
-              '📊 Scores & historique'+(rounds.length>0?' ('+rounds.length+' manche'+(rounds.length>1?'s':'')+')':'')
-            ),
-            e('span', {style:{color:'#c9a84c'}}, showHistory?'▲':'▼')
+        e('div', { style: { marginTop: 18 } },
+          e('div', { onClick: () => setShowHistory(h => !h), style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '9px 13px', borderRadius: 10, background: 'rgba(201,168,76,.05)', border: '1px solid rgba(201,168,76,.13)' } },
+            e('span', { style: { fontFamily: "'Lato',sans-serif", fontSize: '.8rem', color: '#8a7a5a' } }, '📊 Scores & historique' + (rounds.length > 0 ? ' (' + rounds.length + ' manche' + (rounds.length > 1 ? 's' : '') + ')' : '')),
+            e('span', { style: { color: '#c9a84c' } }, showHistory ? '▲' : '▼')
           ),
-          showHistory && rounds.length > 0 && e(HistoryTable, {rounds, players, onEdit:openPastEdit}),
-          showHistory && rounds.length === 0 && e('p', {style:{textAlign:'center', color:'#4a3f2a', fontFamily:"'Lato',sans-serif", fontSize:'.8rem', padding:'10px 0'}}, 'Aucune manche terminée pour l\'instant.')
+          showHistory && rounds.length > 0 && e(HistoryTable, { rounds, players, onEdit: openPastEdit }),
+          showHistory && rounds.length === 0 && e('p', { style: { textAlign: 'center', color: '#4a3f2a', fontFamily: "'Lato',sans-serif", fontSize: '.8rem', padding: '10px 0' } }, 'Aucune manche terminée pour l\'instant.')
         )
       ),
 
       // ══ RESULTS ══
       phase === 'results' && e('div', null,
-        e('div', {className:'sk-card', style:{padding:24, textAlign:'center', marginBottom:14}},
-          e('div', {style:{fontSize:'2.6rem', marginBottom:6}}, '🏆'),
-          e('h2', {style:{margin:'0 0 3px', color:'#c9a84c', fontSize:'1.4rem'}}, 'Fin de partie !'),
-          e('p', {style:{margin:0, fontFamily:"'Lato',sans-serif", color:'#8a7a5a'}}, 'Résultats après '+MAX_ROUNDS+' manches')
+        e('div', { className: 'sk-card', style: { padding: 24, textAlign: 'center', marginBottom: 14 } },
+          e('div', { style: { fontSize: '2.6rem', marginBottom: 6 } }, '🏆'),
+          e('h2', { style: { margin: '0 0 3px', color: '#c9a84c', fontSize: '1.4rem' } }, 'Fin de partie !'),
+          e('p', { style: { margin: 0, fontFamily: "'Lato',sans-serif", color: '#8a7a5a' } }, 'Résultats après ' + MAX_ROUNDS + ' manches')
         ),
         sortedResults.map((p, rank) =>
-          e('div', {key:p.name, className:'sk-card', style:{padding:15, marginBottom:9, borderLeft:'3px solid '+p.color, background:rank===0?'rgba(201,168,76,.09)':undefined}},
-            e('div', {style:{display:'flex', alignItems:'center', gap:13}},
-              e('div', {style:{width:34, height:34, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:900, fontSize:rank===0?'1.1rem':'.95rem', background:rank===0?'linear-gradient(135deg,#c9a84c,#8b6914)':'rgba(201,168,76,.1)', color:rank===0?'#000':'#c9a84c'}},
-                rank===0?'👑':rank+1
+          e('div', { key: p.name, className: 'sk-card', style: { padding: 15, marginBottom: 9, borderLeft: '3px solid ' + p.color, background: rank === 0 ? 'rgba(201,168,76,.09)' : undefined } },
+            e('div', { style: { display: 'flex', alignItems: 'center', gap: 13 } },
+              e('div', { style: { width: 34, height: 34, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: rank === 0 ? '1.1rem' : '.95rem', background: rank === 0 ? 'linear-gradient(135deg,#c9a84c,#8b6914)' : 'rgba(201,168,76,.1)', color: rank === 0 ? '#000' : '#c9a84c' } }, rank === 0 ? '👑' : rank + 1),
+              e('div', { style: { flex: 1 } },
+                e('div', { style: { fontWeight: 700 } }, p.name),
+                rank === 0 && e('div', { style: { fontFamily: "'Lato',sans-serif", fontSize: '.74rem', color: '#c9a84c' } }, 'Grand Capitaine !')
               ),
-              e('div', {style:{flex:1}},
-                e('div', {style:{fontWeight:700}}, p.name),
-                rank===0 && e('div', {style:{fontFamily:"'Lato',sans-serif", fontSize:'.74rem', color:'#c9a84c'}}, 'Grand Capitaine !')
-              ),
-              e('div', {style:{textAlign:'right'}},
-                e('div', {style:{fontSize:'1.35rem'}}, e(ScoreVal, {v:p.score})),
-                e('div', {style:{fontFamily:"'Lato',sans-serif", fontSize:'.68rem', color:'#4a3f2a'}}, 'points')
+              e('div', { style: { textAlign: 'right' } },
+                e('div', { style: { fontSize: '1.35rem' } }, e(ScoreVal, { v: p.score })),
+                e('div', { style: { fontFamily: "'Lato',sans-serif", fontSize: '.68rem', color: '#4a3f2a' } }, 'points')
               )
             )
           )
         ),
-        e('div', {style:{marginTop:16}},
-          e('div', {onClick:()=>setShowHistory(h=>!h), style:{display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'9px 13px', borderRadius:10, background:'rgba(201,168,76,.05)', border:'1px solid rgba(201,168,76,.13)'}},
-            e('span', {style:{fontFamily:"'Lato',sans-serif", fontSize:'.8rem', color:'#8a7a5a'}}, '📋 Détail manche par manche'),
-            e('span', {style:{color:'#c9a84c'}}, showHistory?'▲':'▼')
+        e('div', { style: { marginTop: 16 } },
+          e('div', { onClick: () => setShowHistory(h => !h), style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '9px 13px', borderRadius: 10, background: 'rgba(201,168,76,.05)', border: '1px solid rgba(201,168,76,.13)' } },
+            e('span', { style: { fontFamily: "'Lato',sans-serif", fontSize: '.8rem', color: '#8a7a5a' } }, '📋 Détail manche par manche'),
+            e('span', { style: { color: '#c9a84c' } }, showHistory ? '▲' : '▼')
           ),
-          showHistory && e(HistoryTable, {rounds, players, onEdit:openPastEdit})
+          showHistory && e(HistoryTable, { rounds, players, onEdit: openPastEdit })
         ),
-        e(GoldBtn, {onClick:restartGame, style:{width:'100%', marginTop:16, fontSize:'1rem', padding:14}}, '⚓ Nouvelle partie')
+        e(GoldBtn, { onClick: restartGame, style: { width: '100%', marginTop: 16, fontSize: '1rem', padding: 14 } }, '⚓ Nouvelle partie')
       )
     ),
 
-    // ══ MODAL add player ══
-    showAddPlayer && e('div', {className:'sk-overlay', onClick:()=>setShowAddPlayer(false)},
-      e('div', {className:'sk-modal', onClick:ev=>ev.stopPropagation()},
-        e('h3', {style:{margin:'0 0 13px', color:'#c9a84c'}}, 'Ajouter un joueur'),
-        e('div', {style:{display:'flex', gap:9, marginBottom:11}},
-          e('input', {className:'text-input', value:extraName, placeholder:'Nom du joueur…',
-            onChange:ev=>setExtraName(ev.target.value),
-            onKeyDown:ev=>ev.key==='Enter'&&addPlayerMidGame()})
+    // ══ MODAL référentiel bonus ══
+    showRef && e('div', { className: 'sk-overlay', onClick: () => setShowRef(false) },
+      e('div', { className: 'sk-modal', onClick: ev => ev.stopPropagation() },
+        e('h3', { style: { margin: '0 0 4px', color: '#c9a84c' } }, '📋 Référentiel des bonus'),
+        e('p', { style: { margin: '0 0 14px', fontFamily: "'Lato',sans-serif", fontSize: '.78rem', color: '#8a7a5a' } },
+          'Bonus comptabilisés uniquement si l\'annonce est réussie.'
         ),
-        e('p', {style:{fontFamily:"'Lato',sans-serif", fontSize:'.78rem', color:'#8a7a5a', marginBottom:15}},
-          'Le joueur sera ajouté avec 0 point pour les manches déjà jouées.'
-        ),
-        e('div', {style:{display:'flex', gap:9}},
-          e(GhostBtn, {onClick:()=>setShowAddPlayer(false)}, 'Annuler'),
-          e(GoldBtn, {onClick:addPlayerMidGame, disabled:!extraName.trim()||players.length>=10, style:{flex:1}}, 'Ajouter')
+        e(BonusRef),
+        e('div', { style: { marginTop: 16 } },
+          e(GhostBtn, { onClick: () => setShowRef(false), style: { width: '100%' } }, 'Fermer')
         )
       )
     ),
 
-    // ══ MODAL edit past round ══
-    editingPast !== null && e('div', {className:'sk-overlay', onClick:()=>setEditingPast(null)},
-      e('div', {className:'sk-modal', onClick:ev=>ev.stopPropagation()},
-        e('h3', {style:{margin:'0 0 4px', color:'#c9a84c'}}, 'Modifier — Manche '+(editingPast+1)),
-        e('p', {style:{margin:'0 0 13px', fontFamily:"'Lato',sans-serif", fontSize:'.78rem', color:'#8a7a5a'}},
-          (editingPast+1)+' carte'+(editingPast>0?'s':'')+' · Modifiez annonces, plis et bonus ci-dessous'
+    // ══ MODAL ajouter joueur ══
+    showAddPlayer && e('div', { className: 'sk-overlay', onClick: () => setShowAddPlayer(false) },
+      e('div', { className: 'sk-modal', onClick: ev => ev.stopPropagation() },
+        e('h3', { style: { margin: '0 0 13px', color: '#c9a84c' } }, 'Ajouter un joueur'),
+        e('div', { style: { display: 'flex', gap: 9, marginBottom: 11 } },
+          e('input', { className: 'text-input', value: extraName, placeholder: 'Nom du joueur…', onChange: ev => setExtraName(ev.target.value), onKeyDown: ev => ev.key === 'Enter' && addPlayerMidGame() })
         ),
-        players.map((_, pi) => e(EntryCard, Object.assign({key:pi, pi, entry:pastEntries[pi]||emptyEntry(), entries:pastEntries, setEntries:setPastEntries, roundNum:editingPast+1, showBid:true, showTricks:true}, entryCardProps))),
-        e('div', {style:{display:'flex', gap:9, marginTop:8}},
-          e(GhostBtn, {onClick:()=>setEditingPast(null)}, 'Annuler'),
-          e(GoldBtn, {onClick:savePastEdit, style:{flex:1}}, '💾 Sauvegarder')
+        e('p', { style: { fontFamily: "'Lato',sans-serif", fontSize: '.78rem', color: '#8a7a5a', marginBottom: 15 } }, 'Le joueur sera ajouté avec 0 point pour les manches déjà jouées.'),
+        e('div', { style: { display: 'flex', gap: 9 } },
+          e(GhostBtn, { onClick: () => setShowAddPlayer(false) }, 'Annuler'),
+          e(GoldBtn, { onClick: addPlayerMidGame, disabled: !extraName.trim() || players.length >= 10, style: { flex: 1 } }, 'Ajouter')
         )
       )
     ),
 
-    // ══ MODAL stats ══
-    showStats && e('div', {className:'sk-overlay', onClick:()=>setShowStats(false)},
-      e('div', {className:'sk-modal', onClick:ev=>ev.stopPropagation()},
-        e('h3', {style:{margin:'0 0 4px', color:'#c9a84c'}}, '📊 Statistiques des joueurs'),
-        e('p', {style:{margin:'0 0 15px', fontFamily:"'Lato',sans-serif", fontSize:'.78rem', color:'#8a7a5a'}},
-          'Basé sur les parties terminées (10 manches) sur cet appareil.'
-        ),
-        (function() {
+    // ══ MODAL modifier manche passée ══
+    editingPast !== null && e('div', { className: 'sk-overlay', onClick: () => setEditingPast(null) },
+      e('div', { className: 'sk-modal', onClick: ev => ev.stopPropagation() },
+        e('h3', { style: { margin: '0 0 4px', color: '#c9a84c' } }, 'Modifier — Manche ' + (editingPast + 1)),
+        e('p', { style: { margin: '0 0 13px', fontFamily: "'Lato',sans-serif", fontSize: '.78rem', color: '#8a7a5a' } }, (editingPast + 1) + ' carte' + (editingPast > 0 ? 's' : '') + ' · Annonces, plis et bonus'),
+        players.map((_, pi) => e(EntryCard, Object.assign({ key: pi, pi, entry: pastEntries[pi] || emptyEntry(), entries: pastEntries, setEntries: setPastEntries, roundNum: editingPast + 1, showBid: true, showTricks: true }, cardProps))),
+        e('div', { style: { display: 'flex', gap: 9, marginTop: 8 } },
+          e(GhostBtn, { onClick: () => setEditingPast(null) }, 'Annuler'),
+          e(GoldBtn, { onClick: savePastEdit, style: { flex: 1 } }, '💾 Sauvegarder')
+        )
+      )
+    ),
+
+    // ══ MODAL statistiques ══
+    showStats && e('div', { className: 'sk-overlay', onClick: () => setShowStats(false) },
+      e('div', { className: 'sk-modal', onClick: ev => ev.stopPropagation() },
+        e('h3', { style: { margin: '0 0 4px', color: '#c9a84c' } }, '📊 Statistiques des joueurs'),
+        e('p', { style: { margin: '0 0 15px', fontFamily: "'Lato',sans-serif", fontSize: '.78rem', color: '#8a7a5a' } }, 'Parties terminées (10 manches) sur cet appareil.'),
+        (function () {
           const stats = loadJSON(STORAGE_KEY_STATS, {});
-          const entries = Object.values(stats).sort((a,b) => b.wins-a.wins || b.totalScore-a.totalScore);
-          if (entries.length === 0) {
-            return e('p', {style:{textAlign:'center', color:'#4a3f2a', fontFamily:"'Lato',sans-serif", fontSize:'.85rem', padding:'20px 0'}},
-              'Aucune partie terminée pour l\'instant.'
-            );
-          }
-          return e('div', {style:{overflowX:'auto'}},
-            e('table', {style:{width:'100%', borderCollapse:'collapse', fontFamily:"'Lato',sans-serif", fontSize:'.82rem'}},
-              e('thead', null,
-                e('tr', null,
-                  ['Joueur','Parties','Victoires','Score moy.','Meilleur'].map((h,i) =>
-                    e('th', {key:i, style:{textAlign:i===0?'left':'center', padding:'6px 8px', borderBottom:'1px solid rgba(201,168,76,.2)', color:'#8a7a5a'}}, h)
-                  )
+          const entries = Object.values(stats).sort((a, b) => b.wins - a.wins || b.totalScore - a.totalScore);
+          if (entries.length === 0) return e('p', { style: { textAlign: 'center', color: '#4a3f2a', fontFamily: "'Lato',sans-serif", fontSize: '.85rem', padding: '20px 0' } }, 'Aucune partie terminée pour l\'instant.');
+          return e('div', { style: { overflowX: 'auto' } },
+            e('table', { style: { width: '100%', borderCollapse: 'collapse', fontFamily: "'Lato',sans-serif", fontSize: '.82rem' } },
+              e('thead', null, e('tr', null, ['Joueur', 'Parties', 'Victoires', 'Moy.', 'Meilleur'].map((h, i) =>
+                e('th', { key: i, style: { textAlign: i === 0 ? 'left' : 'center', padding: '6px 8px', borderBottom: '1px solid rgba(201,168,76,.2)', color: '#8a7a5a' } }, h)
+              ))),
+              e('tbody', null, entries.map(p =>
+                e('tr', { key: p.displayName, style: { borderBottom: '1px solid rgba(201,168,76,.07)' } },
+                  e('td', { style: { padding: '6px 8px', fontWeight: 700, color: '#e8d5b0' } }, p.displayName),
+                  e('td', { style: { padding: '6px 8px', textAlign: 'center' } }, p.gamesPlayed),
+                  e('td', { style: { padding: '6px 8px', textAlign: 'center', color: '#c9a84c', fontWeight: 700 } }, p.wins + ' 👑'),
+                  e('td', { style: { padding: '6px 8px', textAlign: 'center' } }, e(ScoreVal, { v: Math.round(p.totalScore / p.gamesPlayed) })),
+                  e('td', { style: { padding: '6px 8px', textAlign: 'center' } }, e(ScoreVal, { v: p.bestScore }))
                 )
-              ),
-              e('tbody', null,
-                entries.map(p =>
-                  e('tr', {key:p.displayName, style:{borderBottom:'1px solid rgba(201,168,76,.07)'}},
-                    e('td', {style:{padding:'6px 8px', fontWeight:700, color:'#e8d5b0'}}, p.displayName),
-                    e('td', {style:{padding:'6px 8px', textAlign:'center'}}, p.gamesPlayed),
-                    e('td', {style:{padding:'6px 8px', textAlign:'center', color:'#c9a84c', fontWeight:700}}, p.wins+' 👑'),
-                    e('td', {style:{padding:'6px 8px', textAlign:'center'}}, e(ScoreVal, {v:Math.round(p.totalScore/p.gamesPlayed)})),
-                    e('td', {style:{padding:'6px 8px', textAlign:'center'}}, e(ScoreVal, {v:p.bestScore}))
-                  )
-                )
-              )
+              ))
             )
           );
         })(),
-        e('div', {style:{display:'flex', gap:9, marginTop:18}},
-          e(GhostBtn, {onClick:()=>setShowStats(false), style:{flex:1}}, 'Fermer')
+        e('div', { style: { marginTop: 18 } },
+          e(GhostBtn, { onClick: () => setShowStats(false), style: { width: '100%' } }, 'Fermer')
         )
       )
     )
   );
 }
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(React.createElement(SkullKing));
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(SkullKing));
 </script>
 </body>
 </html>
