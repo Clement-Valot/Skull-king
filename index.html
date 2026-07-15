@@ -1292,7 +1292,86 @@ function isGameInProgress(game) {
 }
 
 // ── Accueil ───────────────────────────────────────────────────────────────────
+const SUGGESTION_EMAIL = 'val.croissy@gmail.com';
+const SUGGESTION_SUBJECT = '[Webapp point scorer] Suggestion amélioration';
+
+function SuggestionModal({ onClose }) {
+  const [name, setName] = useState('');
+  const [message, setMessage] = useState('');
+  const [status, setStatus] = useState('idle'); // idle | sending | success | pending-activation | error
+
+  function submit() {
+    if (!message.trim() || status === 'sending') return;
+    setStatus('sending');
+    fetch('https://formsubmit.co/ajax/' + SUGGESTION_EMAIL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        name: name.trim() || 'Anonyme',
+        message: message.trim(),
+        _subject: SUGGESTION_SUBJECT
+      })
+    })
+      .then(r => r.json().then(data => ({ ok: r.ok, data })))
+      .then(res => {
+        if (!res.ok) throw new Error('send failed');
+        if (res.data && res.data.success === 'false') { setStatus('pending-activation'); return; }
+        setStatus('success');
+      })
+      .catch(() => setStatus('error'));
+  }
+
+  if (status === 'success') {
+    return e('div', { className: 'sk-overlay', onClick: onClose },
+      e('div', { className: 'sk-modal', onClick: ev => ev.stopPropagation() },
+        e('div', { style: { textAlign: 'center', padding: '10px 0' } },
+          e('div', { style: { fontSize: '2.2rem', marginBottom: 10 } }, '✅'),
+          e('h3', { style: { margin: '0 0 8px', color: '#c9a84c' } }, 'Message envoyé !'),
+          e('p', { style: { fontFamily: "'Lato',sans-serif", color: '#8a7a5a', fontSize: '.85rem', marginBottom: 18 } }, 'Merci pour votre retour.'),
+          e(GoldBtn, { onClick: onClose, style: { width: '100%' } }, 'Fermer')
+        )
+      )
+    );
+  }
+
+  if (status === 'pending-activation') {
+    return e('div', { className: 'sk-overlay', onClick: onClose },
+      e('div', { className: 'sk-modal', onClick: ev => ev.stopPropagation() },
+        e('div', { style: { textAlign: 'center', padding: '10px 0' } },
+          e('div', { style: { fontSize: '2.2rem', marginBottom: 10 } }, '📬'),
+          e('h3', { style: { margin: '0 0 8px', color: '#c9a84c' } }, 'Dernière étape'),
+          e('p', { style: { fontFamily: "'Lato',sans-serif", color: '#8a7a5a', fontSize: '.85rem', marginBottom: 18 } },
+            'Un email d\'activation vient d\'être envoyé à ' + SUGGESTION_EMAIL + '. Cliquez sur le lien "Activate Form" qu\'il contient pour activer la réception — ce message et tous les suivants arriveront ensuite normalement.'
+          ),
+          e(GoldBtn, { onClick: onClose, style: { width: '100%' } }, 'Fermer')
+        )
+      )
+    );
+  }
+
+  return e('div', { className: 'sk-overlay', onClick: onClose },
+    e('div', { className: 'sk-modal', onClick: ev => ev.stopPropagation() },
+      e('h3', { style: { margin: '0 0 4px', color: '#c9a84c' } }, '💡 Suggestion'),
+      e('p', { style: { margin: '0 0 15px', fontFamily: "'Lato',sans-serif", fontSize: '.78rem', color: '#8a7a5a' } }, 'Signalez un bug ou proposez une amélioration, directement depuis l\'application.'),
+      e('div', { style: { marginBottom: 11 } },
+        e('label', { style: fieldLabelStyle }, 'Votre nom (optionnel)'),
+        e('input', { className: 'text-input', style: { width: '100%', boxSizing: 'border-box' }, value: name, onChange: ev => setName(ev.target.value), placeholder: 'Nom' })
+      ),
+      e('div', { style: { marginBottom: 11 } },
+        e('label', { style: fieldLabelStyle }, 'Message'),
+        e('textarea', { className: 'text-input', style: { width: '100%', boxSizing: 'border-box', minHeight: 110, resize: 'vertical', fontFamily: "'Lato',sans-serif" }, value: message, onChange: ev => setMessage(ev.target.value), placeholder: 'Décrivez le bug ou votre idée…' })
+      ),
+      status === 'error' && e('p', { style: { color: '#f87171', fontFamily: "'Lato',sans-serif", fontSize: '.78rem', marginBottom: 10 } }, 'Erreur lors de l\'envoi. Réessayez.'),
+      e('div', { style: { display: 'flex', gap: 9 } },
+        e(GhostBtn, { onClick: onClose }, 'Annuler'),
+        e(GoldBtn, { onClick: submit, disabled: !message.trim() || status === 'sending', style: { flex: 1 } }, status === 'sending' ? 'Envoi…' : 'Envoyer')
+      )
+    )
+  );
+}
+
 function Home({ onSelect }) {
+  const [showSuggestion, setShowSuggestion] = useState(false);
   return e('div', { style: { minHeight: '100vh', background: 'radial-gradient(ellipse at 60% 0%,#0d2137 0%,#051020 60%,#000 100%)', position: 'relative', overflow: 'hidden' } },
     e('div', { className: 'sk-skull' }, '🎲'),
     e('div', { className: 'sk-wave' }),
@@ -1321,15 +1400,12 @@ function Home({ onSelect }) {
       ),
       e('div', { className: 'sk-card', style: { padding: 20, marginTop: 26, textAlign: 'center' } },
         e('p', { style: { margin: '0 0 12px', fontFamily: "'Lato',sans-serif", fontSize: '.8rem', color: '#8a7a5a', lineHeight: 1.5 } },
-          'Un bug à signaler ou une idée d\'amélioration ? Cliquez ci-dessous pour nous l\'envoyer par email.'
+          'Un bug à signaler ou une idée d\'amélioration ? Envoyez-nous un message directement depuis l\'application.'
         ),
-        e('a', {
-          href: 'mailto:val.croissy@gmail.com?subject=' + encodeURIComponent('[Webapp point scorer] Suggestion amélioration'),
-          className: 'gold-btn',
-          style: { display: 'inline-block', textDecoration: 'none' }
-        }, '💡 Suggestion')
+        e(GoldBtn, { onClick: () => setShowSuggestion(true) }, '💡 Suggestion')
       )
-    )
+    ),
+    showSuggestion && e(SuggestionModal, { onClose: () => setShowSuggestion(false) })
   );
 }
 
