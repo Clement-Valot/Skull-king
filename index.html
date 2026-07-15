@@ -564,9 +564,726 @@ function SkullKingGame({ onExit }) {
   );
 }
 
+// ── Helpers partagés entre jeux ────────────────────────────────────────────────
+const KNOWN_PLAYERS_KEY = 'app_known_players';
+const fieldLabelStyle = { display: 'block', fontFamily: "'Lato',sans-serif", fontSize: '.78rem', color: '#8a7a5a', marginBottom: 5 };
+
+function useKnownPlayers() {
+  const [knownPlayers, setKnownPlayers] = useState(() => loadJSON(KNOWN_PLAYERS_KEY, []));
+  function remember(names) {
+    setKnownPlayers(prev => {
+      const merged = prev.slice();
+      names.forEach(n => { const t = (n || '').trim(); if (t && !merged.some(m => norm(m) === norm(t))) merged.push(t); });
+      saveJSON(KNOWN_PLAYERS_KEY, merged);
+      return merged;
+    });
+  }
+  return [knownPlayers, remember];
+}
+
+function PlayerPicker({ players, setPlayers, min, max, knownPlayers, remember }) {
+  const [nameInput, setNameInput] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  function add() {
+    const name = nameInput.trim();
+    if (!name || players.length >= max) return;
+    setPlayers(p => p.concat(name));
+    remember([name]);
+    setNameInput('');
+    setShowSuggestions(false);
+  }
+
+  const suggestions = knownPlayers.filter(kp => !players.some(p => norm(p) === norm(kp)) && (!nameInput.trim() || norm(kp).includes(norm(nameInput))));
+
+  return e(React.Fragment, null,
+    e('div', { style: { display: 'flex', gap: 9, marginBottom: 10 } },
+      e('input', { className: 'text-input', value: nameInput, placeholder: 'Nom du joueur…', onChange: ev => setNameInput(ev.target.value), onFocus: () => setShowSuggestions(true), onKeyDown: ev => ev.key === 'Enter' && add() }),
+      e(GoldBtn, { onClick: add, disabled: !nameInput.trim() || players.length >= max }, '+')
+    ),
+    showSuggestions && suggestions.length > 0 && e('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 15 } },
+      suggestions.map(kp => e('div', { key: kp, className: 'suggestion-chip', onClick: () => { setPlayers(p => p.concat(kp)); setNameInput(''); } }, '+ ' + kp))
+    ),
+    e('div', { style: { display: 'flex', flexDirection: 'column', gap: 7, minHeight: 44, marginBottom: 20 } },
+      players.length === 0
+        ? e('p', { style: { color: '#4a3f2a', fontFamily: "'Lato',sans-serif", fontSize: '.85rem', textAlign: 'center', margin: 'auto' } }, 'Ajoutez au moins ' + min + ' joueurs')
+        : players.map((p, i) => e('div', { key: i, style: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 13px', borderRadius: 8, background: 'rgba(201,168,76,.08)', border: '1px solid rgba(201,168,76,.2)' } },
+          e('div', { style: { width: 9, height: 9, borderRadius: '50%', background: SEA_COLORS[i % SEA_COLORS.length], flexShrink: 0 } }),
+          e('span', { style: { flex: 1, fontFamily: "'Lato',sans-serif" } }, p),
+          e('button', { onClick: () => setPlayers(ps => ps.filter((_, idx) => idx !== i)), style: { background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: '1.1rem', padding: '0 3px' } }, '×')
+        ))
+    )
+  );
+}
+
+function GameHeader({ onExit, icon, title }) {
+  return e('div', { style: { textAlign: 'center', marginBottom: 24, position: 'relative' } },
+    e(GhostBtn, { onClick: onExit, style: { position: 'absolute', left: 0, top: 4, fontSize: '.72rem', padding: '5px 10px' } }, '← Jeux'),
+    e('div', { style: { fontSize: '2.2rem', marginBottom: 2 } }, icon),
+    e('h1', { style: { margin: 0, fontSize: '1.85rem', fontWeight: 900, letterSpacing: '.08em', color: '#c9a84c', textShadow: '0 0 28px rgba(201,168,76,.5)' } }, title),
+    e('p', { style: { margin: '3px 0 0', fontFamily: "'Lato',sans-serif", color: '#8a7a5a', fontSize: '.75rem', letterSpacing: '.22em' } }, 'COMPTEUR DE POINTS')
+  );
+}
+
+function ResultsPodium({ sortedResults }) {
+  return sortedResults.map((p, rank) =>
+    e('div', { key: p.name, className: 'sk-card', style: { padding: 15, marginBottom: 9, borderLeft: '3px solid ' + p.color, background: rank === 0 ? 'rgba(201,168,76,.09)' : undefined } },
+      e('div', { style: { display: 'flex', alignItems: 'center', gap: 13 } },
+        e('div', { style: { width: 34, height: 34, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: rank === 0 ? '1.1rem' : '.95rem', background: rank === 0 ? 'linear-gradient(135deg,#c9a84c,#8b6914)' : 'rgba(201,168,76,.1)', color: rank === 0 ? '#000' : '#c9a84c' } }, rank === 0 ? '👑' : rank + 1),
+        e('div', { style: { flex: 1 } }, e('div', { style: { fontWeight: 700 } }, p.name)),
+        e('div', { style: { textAlign: 'right' } }, e('div', { style: { fontSize: '1.35rem' } }, e(ScoreVal, { v: p.score })))
+      )
+    )
+  );
+}
+
+function HistoryToggle({ showHistory, setShowHistory, label }) {
+  return e('div', { onClick: () => setShowHistory(h => !h), style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '9px 13px', borderRadius: 10, background: 'rgba(201,168,76,.05)', border: '1px solid rgba(201,168,76,.13)' } },
+    e('span', { style: { fontFamily: "'Lato',sans-serif", fontSize: '.8rem', color: '#8a7a5a' } }, label),
+    e('span', { style: { color: '#c9a84c' } }, showHistory ? '▲' : '▼')
+  );
+}
+
+// ── Jeu : Tarot ───────────────────────────────────────────────────────────────
+const STORAGE_KEY_TAROT = 'tarot_current_game';
+
+const TAROT_CONTRACTS = [
+  { id: 'petite', label: 'Petite', mult: 1 },
+  { id: 'garde', label: 'Garde', mult: 2 },
+  { id: 'garde_sans', label: 'Garde Sans le chien', mult: 4 },
+  { id: 'garde_contre', label: 'Garde Contre le chien', mult: 6 },
+];
+const TAROT_NEEDED_BY_BOUTS = { 0: 56, 1: 51, 2: 41, 3: 36 };
+const TAROT_POIGNEE_PTS = { none: 0, simple: 20, double: 30, triple: 40 };
+const TAROT_CHELEM_PTS = { none: 0, reussi_annonce: 400, reussi_non_annonce: 200, rate_annonce: -200 };
+
+function emptyTarotRound() {
+  return { preneur: 0, appele: null, contract: 'petite', bouts: 0, pointsMade: 41, petitAuBout: 'none', poigneeWho: 'preneur', poigneeType: 'none', chelem: 'none' };
+}
+
+function calcTarotDeltas(round, playerCount) {
+  const contract = TAROT_CONTRACTS.find(c => c.id === round.contract) || TAROT_CONTRACTS[0];
+  const needed = TAROT_NEEDED_BY_BOUTS[round.bouts];
+  const diff = round.pointsMade - needed;
+  const success = diff >= 0;
+  let score = (25 + Math.abs(diff)) * contract.mult;
+  if (!success) score = -score;
+  if (round.petitAuBout === 'pour') score += 10 * contract.mult;
+  else if (round.petitAuBout === 'contre') score -= 10 * contract.mult;
+  const poigneePts = TAROT_POIGNEE_PTS[round.poigneeType] || 0;
+  if (poigneePts > 0) score += round.poigneeWho === 'preneur' ? poigneePts : -poigneePts;
+  score += TAROT_CHELEM_PTS[round.chelem] || 0;
+
+  const hasPartner = playerCount === 5 && round.appele !== null && round.appele !== round.preneur;
+  const deltas = {};
+  if (hasPartner) {
+    deltas[round.preneur] = score * 2;
+    deltas[round.appele] = score;
+  } else {
+    deltas[round.preneur] = score * (playerCount - 1);
+  }
+  for (let i = 0; i < playerCount; i++) {
+    if (i === round.preneur) continue;
+    if (hasPartner && i === round.appele) continue;
+    deltas[i] = -score;
+  }
+  return deltas;
+}
+
+function TarotRoundForm({ players, round, setRound, onSubmit, submitLabel }) {
+  const n = players.length;
+  function patch(p) { setRound(Object.assign({}, round, p)); }
+  return e('div', { className: 'sk-card', style: { padding: 16, marginBottom: 11 } },
+    e('div', { style: { marginBottom: 12 } },
+      e('label', { style: fieldLabelStyle }, 'Preneur'),
+      e('select', { className: 'text-input', value: round.preneur, onChange: ev => patch({ preneur: parseInt(ev.target.value), appele: null }) },
+        players.map((p, i) => e('option', { key: i, value: i }, p))
+      )
+    ),
+    n === 5 && e('div', { style: { marginBottom: 12 } },
+      e('label', { style: fieldLabelStyle }, 'Appelé (partenaire)'),
+      e('select', { className: 'text-input', value: round.appele === null ? '' : round.appele, onChange: ev => patch({ appele: ev.target.value === '' ? null : parseInt(ev.target.value) }) },
+        e('option', { value: '' }, 'Seul contre tous'),
+        players.map((p, i) => i !== round.preneur && e('option', { key: i, value: i }, p))
+      )
+    ),
+    e('div', { style: { marginBottom: 12 } },
+      e('label', { style: fieldLabelStyle }, 'Contrat'),
+      e('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 7 } },
+        TAROT_CONTRACTS.map(c => e('button', {
+          key: c.id, type: 'button', onClick: () => patch({ contract: c.id }),
+          className: round.contract === c.id ? 'gold-btn' : 'ghost-btn',
+          style: { fontSize: '.78rem', padding: '7px 11px' }
+        }, c.label))
+      )
+    ),
+    e('div', { style: { display: 'flex', gap: 20, marginBottom: 8, flexWrap: 'wrap' } },
+      e('div', null,
+        e('label', { style: fieldLabelStyle }, 'Bouts du preneur'),
+        e('select', { className: 'num-input', style: { width: 58 }, value: round.bouts, onChange: ev => patch({ bouts: parseInt(ev.target.value) }) },
+          [0, 1, 2, 3].map(b => e('option', { key: b, value: b }, b))
+        )
+      ),
+      e('div', null,
+        e('label', { style: fieldLabelStyle }, 'Points réalisés (/91)'),
+        e('input', { type: 'number', className: 'num-input', min: 0, max: 91, value: round.pointsMade, onChange: ev => patch({ pointsMade: Math.max(0, Math.min(91, parseInt(ev.target.value) || 0)) }) })
+      )
+    ),
+    e('div', { style: { fontSize: '.72rem', color: '#8a7a5a', fontFamily: "'Lato',sans-serif", marginBottom: 12 } },
+      'Points requis avec ' + round.bouts + ' bout' + (round.bouts > 1 ? 's' : '') + ' : ' + TAROT_NEEDED_BY_BOUTS[round.bouts]
+    ),
+    e('div', { style: { marginBottom: 12 } },
+      e('label', { style: fieldLabelStyle }, 'Petit au bout'),
+      e('select', { className: 'text-input', value: round.petitAuBout, onChange: ev => patch({ petitAuBout: ev.target.value }) },
+        e('option', { value: 'none' }, 'Non joué / sans objet'),
+        e('option', { value: 'pour' }, 'Pour le preneur (+10×mult.)'),
+        e('option', { value: 'contre' }, 'Contre le preneur (−10×mult.)')
+      )
+    ),
+    e('div', { style: { display: 'flex', gap: 20, marginBottom: 12, flexWrap: 'wrap' } },
+      e('div', null,
+        e('label', { style: fieldLabelStyle }, 'Poignée'),
+        e('select', { className: 'text-input', value: round.poigneeType, onChange: ev => patch({ poigneeType: ev.target.value }) },
+          e('option', { value: 'none' }, 'Aucune'),
+          e('option', { value: 'simple' }, 'Simple (+20)'),
+          e('option', { value: 'double' }, 'Double (+30)'),
+          e('option', { value: 'triple' }, 'Triple (+40)')
+        )
+      ),
+      round.poigneeType !== 'none' && e('div', null,
+        e('label', { style: fieldLabelStyle }, 'Camp'),
+        e('select', { className: 'text-input', value: round.poigneeWho, onChange: ev => patch({ poigneeWho: ev.target.value }) },
+          e('option', { value: 'preneur' }, 'Preneur'),
+          e('option', { value: 'defense' }, 'Défense')
+        )
+      )
+    ),
+    e('div', { style: { marginBottom: 14 } },
+      e('label', { style: fieldLabelStyle }, 'Chelem'),
+      e('select', { className: 'text-input', value: round.chelem, onChange: ev => patch({ chelem: ev.target.value }) },
+        e('option', { value: 'none' }, 'Aucun'),
+        e('option', { value: 'reussi_non_annonce' }, 'Réussi, non annoncé (+200)'),
+        e('option', { value: 'reussi_annonce' }, 'Réussi, annoncé (+400)'),
+        e('option', { value: 'rate_annonce' }, 'Annoncé, raté (−200)')
+      )
+    ),
+    e(GoldBtn, { onClick: onSubmit, style: { width: '100%' } }, submitLabel)
+  );
+}
+
+function TarotHistoryTable({ rounds, players, onEdit }) {
+  function total(pi) {
+    return rounds.reduce((sum, r) => sum + (calcTarotDeltas(r, players.length)[pi] || 0), 0);
+  }
+  return e('div', { style: { overflowX: 'auto', padding: 12, marginTop: 8, borderRadius: 10, background: 'rgba(5,16,32,.88)', border: '1px solid rgba(201,168,76,.28)' } },
+    e('table', { style: { width: '100%', borderCollapse: 'collapse', fontFamily: "'Lato',sans-serif", fontSize: '.75rem' } },
+      e('thead', null,
+        e('tr', null,
+          e('th', { style: { color: '#4a3f2a', textAlign: 'left', padding: '4px 6px', borderBottom: '1px solid rgba(201,168,76,.2)' } }, 'M.'),
+          e('th', { style: { color: '#4a3f2a', textAlign: 'left', padding: '4px 6px', borderBottom: '1px solid rgba(201,168,76,.2)' } }, 'Preneur'),
+          players.map((p, i) => e('th', { key: i, style: { color: SEA_COLORS[i % SEA_COLORS.length], padding: '4px 5px', borderBottom: '1px solid rgba(201,168,76,.2)', textAlign: 'center' } }, p)),
+          e('th', { style: { borderBottom: '1px solid rgba(201,168,76,.2)', width: 30 } })
+        )
+      ),
+      e('tbody', null,
+        rounds.map((r, ri) => {
+          const deltas = calcTarotDeltas(r, players.length);
+          const contract = TAROT_CONTRACTS.find(c => c.id === r.contract) || TAROT_CONTRACTS[0];
+          return e('tr', { key: ri, style: { borderBottom: '1px solid rgba(201,168,76,.07)' } },
+            e('td', { style: { padding: '4px 6px', color: '#c9a84c', fontWeight: 700 } }, ri + 1),
+            e('td', { style: { padding: '4px 6px', color: '#8a7a5a' } }, players[r.preneur] + ' (' + contract.label + ')'),
+            players.map((_, pi) => e('td', { key: pi, style: { padding: '4px 5px', textAlign: 'center' } }, e(ScoreVal, { v: deltas[pi] !== undefined ? deltas[pi] : 0 }))),
+            e('td', { style: { padding: '4px 5px' } },
+              e('button', { onClick: () => onEdit(ri), style: { background: 'transparent', border: '1px solid rgba(201,168,76,.35)', color: '#c9a84c', borderRadius: 6, padding: '1px 5px', cursor: 'pointer', fontSize: '.68rem', fontFamily: "'Cinzel',serif" } }, '✏️')
+            )
+          );
+        }),
+        rounds.length > 0 && e('tr', { key: 'total', style: { borderTop: '2px solid rgba(201,168,76,.3)' } },
+          e('td', { style: { padding: '4px 6px', color: '#8a7a5a', fontSize: '.7rem', fontFamily: "'Cinzel',serif" } }, 'TOTAL'),
+          e('td'),
+          players.map((_, pi) => e('td', { key: pi, style: { padding: '4px 5px', textAlign: 'center' } }, e(ScoreVal, { v: total(pi) }))),
+          e('td')
+        )
+      )
+    )
+  );
+}
+
+function TarotGame({ onExit }) {
+  const saved = loadJSON(STORAGE_KEY_TAROT, null);
+  const [phase, setPhase] = useState(saved && saved.phase || 'setup');
+  const [players, setPlayers] = useState(saved && saved.players || []);
+  const [rounds, setRounds] = useState(saved && saved.rounds || []);
+  const [round, setRound] = useState(emptyTarotRound());
+  const [editingPast, setEditingPast] = useState(null);
+  const [pastRound, setPastRound] = useState(null);
+  const [showHistory, setShowHistory] = useState(true);
+  const [knownPlayers, rememberPlayers] = useKnownPlayers();
+
+  useEffect(() => { saveJSON(STORAGE_KEY_TAROT, { phase, players, rounds }); }, [phase, players, rounds]);
+
+  function totalFor(pi) {
+    return rounds.reduce((sum, r) => sum + (calcTarotDeltas(r, players.length)[pi] || 0), 0);
+  }
+
+  function startGame() {
+    if (players.length < 3 || players.length > 5) return;
+    rememberPlayers(players);
+    setRounds([]);
+    setRound(emptyTarotRound());
+    setPhase('playing');
+  }
+
+  function submitRound() {
+    setRounds(rs => rs.concat([round]));
+    setRound(emptyTarotRound());
+  }
+
+  function openPastEdit(ri) { setEditingPast(ri); setPastRound(Object.assign({}, rounds[ri])); }
+  function savePastEdit() {
+    setRounds(rs => rs.map((r, ri) => ri === editingPast ? pastRound : r));
+    setEditingPast(null);
+  }
+
+  function endGame() { setPhase('results'); }
+
+  function restartGame() {
+    setPhase('setup'); setPlayers([]); setRounds([]); setRound(emptyTarotRound());
+    localStorage.removeItem(STORAGE_KEY_TAROT);
+  }
+
+  const sortedResults = players.map((name, i) => ({ name, score: totalFor(i), color: SEA_COLORS[i % SEA_COLORS.length] })).sort((a, b) => b.score - a.score);
+
+  return e('div', { style: { minHeight: '100vh', background: 'radial-gradient(ellipse at 60% 0%,#0d2137 0%,#051020 60%,#000 100%)', position: 'relative', overflow: 'hidden' } },
+    e('div', { className: 'sk-skull' }, '🔮'),
+    e('div', { className: 'sk-wave' }),
+    e('div', { className: 'sk-wave sk-wave2' }),
+    e('div', { style: { position: 'relative', zIndex: 1, maxWidth: 700, margin: '0 auto', padding: '20px 13px 90px' } },
+      e(GameHeader, { onExit, icon: '🔮', title: 'TAROT' }),
+
+      phase === 'setup' && e('div', { className: 'sk-card', style: { padding: 24 } },
+        e('h2', { style: { margin: '0 0 15px', fontSize: '1rem', color: '#c9a84c', letterSpacing: '.1em' } }, 'Joueurs (' + players.length + '/5)'),
+        e(PlayerPicker, { players, setPlayers, min: 3, max: 5, knownPlayers, remember: rememberPlayers }),
+        e('p', { style: { fontFamily: "'Lato',sans-serif", fontSize: '.75rem', color: '#4a3f2a', marginBottom: 15, textAlign: 'center' } }, 'De 3 à 5 joueurs'),
+        e(GoldBtn, { onClick: startGame, disabled: players.length < 3 || players.length > 5, style: { width: '100%', fontSize: '1rem', padding: 13 } }, '🔮 Commencer la partie')
+      ),
+
+      phase === 'playing' && e('div', null,
+        e('div', { className: 'sk-card', style: { padding: 16, marginBottom: 11 } },
+          e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+            e('div', null,
+              e('p', { style: { margin: 0, fontFamily: "'Lato',sans-serif", color: '#8a7a5a', fontSize: '.7rem', letterSpacing: '.15em' } }, 'MANCHE'),
+              e('p', { style: { margin: 0, fontSize: '1.6rem', fontWeight: 900, color: '#c9a84c', lineHeight: 1 } }, rounds.length + 1)
+            ),
+            e('span', { onClick: () => { if (window.confirm('Abandonner la partie en cours ?')) restartGame(); }, style: { fontFamily: "'Lato',sans-serif", fontSize: '.7rem', color: '#4a3f2a', cursor: 'pointer', textDecoration: 'underline' } }, 'Abandonner la partie')
+          )
+        ),
+        e(TarotRoundForm, { players, round, setRound, onSubmit: submitRound, submitLabel: 'Valider la manche →' }),
+        rounds.length > 0 && e(GoldBtn, { onClick: endGame, style: { width: '100%', marginBottom: 4 } }, '🏁 Terminer la partie'),
+        e('div', { style: { marginTop: 18 } },
+          e(HistoryToggle, { showHistory, setShowHistory, label: '📊 Scores & historique' + (rounds.length > 0 ? ' (' + rounds.length + ' manche' + (rounds.length > 1 ? 's' : '') + ')' : '') }),
+          showHistory && rounds.length > 0 && e(TarotHistoryTable, { rounds, players, onEdit: openPastEdit }),
+          showHistory && rounds.length === 0 && e('p', { style: { textAlign: 'center', color: '#4a3f2a', fontFamily: "'Lato',sans-serif", fontSize: '.8rem', padding: '10px 0' } }, 'Aucune manche terminée pour l\'instant.')
+        )
+      ),
+
+      phase === 'results' && e('div', null,
+        e('div', { className: 'sk-card', style: { padding: 24, textAlign: 'center', marginBottom: 14 } },
+          e('div', { style: { fontSize: '2.6rem', marginBottom: 6 } }, '🏆'),
+          e('h2', { style: { margin: '0 0 3px', color: '#c9a84c', fontSize: '1.4rem' } }, 'Fin de partie !'),
+          e('p', { style: { margin: 0, fontFamily: "'Lato',sans-serif", color: '#8a7a5a' } }, 'Résultats après ' + rounds.length + ' manche' + (rounds.length > 1 ? 's' : ''))
+        ),
+        e(ResultsPodium, { sortedResults }),
+        e('div', { style: { marginTop: 16 } },
+          e(HistoryToggle, { showHistory, setShowHistory, label: '📋 Détail manche par manche' }),
+          showHistory && e(TarotHistoryTable, { rounds, players, onEdit: openPastEdit })
+        ),
+        e(GoldBtn, { onClick: restartGame, style: { width: '100%', marginTop: 16, fontSize: '1rem', padding: 14 } }, '🔮 Nouvelle partie')
+      )
+    ),
+
+    editingPast !== null && e('div', { className: 'sk-overlay', onClick: () => setEditingPast(null) },
+      e('div', { className: 'sk-modal', onClick: ev => ev.stopPropagation() },
+        e('h3', { style: { margin: '0 0 13px', color: '#c9a84c' } }, 'Modifier — Manche ' + (editingPast + 1)),
+        pastRound && e(TarotRoundForm, { players, round: pastRound, setRound: setPastRound, onSubmit: savePastEdit, submitLabel: '💾 Sauvegarder' }),
+        e(GhostBtn, { onClick: () => setEditingPast(null), style: { width: '100%', marginTop: 8 } }, 'Annuler')
+      )
+    )
+  );
+}
+
+// ── Jeu : Belote coinchée ───────────────────────────────────────────────────────
+const STORAGE_KEY_BELOTE = 'belote_current_game';
+
+function emptyBeloteRound() {
+  return { team: 'A', contract: 80, coinche: 'none', pointsMade: 82, belote: 'none' };
+}
+
+function calcBeloteRoundScores(round) {
+  const mult = round.coinche === 'surcoinche' ? 4 : round.coinche === 'coinche' ? 2 : 1;
+  const success = round.pointsMade >= round.contract;
+  let takerScore = 0, defenseScore = 0;
+  if (success) takerScore = (round.contract + round.pointsMade) * mult;
+  else defenseScore = (162 + round.contract) * mult;
+  const scores = { A: 0, B: 0 };
+  if (round.team === 'A') { scores.A = takerScore; scores.B = defenseScore; }
+  else { scores.B = takerScore; scores.A = defenseScore; }
+  if (round.belote === 'A') scores.A += 20;
+  else if (round.belote === 'B') scores.B += 20;
+  return scores;
+}
+function calcBeloteDelta(round, team) { return calcBeloteRoundScores(round)[team]; }
+
+function BeloteRoundForm({ teamA, teamB, round, setRound, onSubmit, submitLabel }) {
+  function patch(p) { setRound(Object.assign({}, round, p)); }
+  function teamLabel(t) { return (t === 'A' ? teamA : teamB).join(' & '); }
+  const res = calcBeloteRoundScores(round);
+  const success = round.pointsMade >= round.contract;
+  return e('div', { className: 'sk-card', style: { padding: 16, marginBottom: 11 } },
+    e('div', { style: { marginBottom: 12 } },
+      e('label', { style: fieldLabelStyle }, 'Équipe preneuse'),
+      e('div', { style: { display: 'flex', gap: 8 } },
+        e('button', { type: 'button', onClick: () => patch({ team: 'A' }), className: round.team === 'A' ? 'gold-btn' : 'ghost-btn', style: { flex: 1, fontSize: '.82rem' } }, teamLabel('A')),
+        e('button', { type: 'button', onClick: () => patch({ team: 'B' }), className: round.team === 'B' ? 'gold-btn' : 'ghost-btn', style: { flex: 1, fontSize: '.82rem' } }, teamLabel('B'))
+      )
+    ),
+    e('div', { style: { display: 'flex', gap: 20, marginBottom: 12, flexWrap: 'wrap' } },
+      e('div', null,
+        e('label', { style: fieldLabelStyle }, 'Contrat annoncé'),
+        e('input', { type: 'number', className: 'num-input', style: { width: 70 }, min: 80, step: 10, value: round.contract, onChange: ev => patch({ contract: Math.max(80, parseInt(ev.target.value) || 80) }) })
+      ),
+      e('div', null,
+        e('label', { style: fieldLabelStyle }, 'Points réalisés (/162)'),
+        e('input', { type: 'number', className: 'num-input', style: { width: 70 }, min: 0, max: 162, value: round.pointsMade, onChange: ev => patch({ pointsMade: Math.max(0, Math.min(162, parseInt(ev.target.value) || 0)) }) })
+      )
+    ),
+    e('div', { style: { marginBottom: 12 } },
+      e('label', { style: fieldLabelStyle }, 'Coinché'),
+      e('div', { style: { display: 'flex', gap: 8 } },
+        e('button', { type: 'button', onClick: () => patch({ coinche: 'none' }), className: round.coinche === 'none' ? 'gold-btn' : 'ghost-btn', style: { flex: 1, fontSize: '.78rem', padding: '7px 6px' } }, 'Aucun'),
+        e('button', { type: 'button', onClick: () => patch({ coinche: 'coinche' }), className: round.coinche === 'coinche' ? 'gold-btn' : 'ghost-btn', style: { flex: 1, fontSize: '.78rem', padding: '7px 6px' } }, 'Coinché ×2'),
+        e('button', { type: 'button', onClick: () => patch({ coinche: 'surcoinche' }), className: round.coinche === 'surcoinche' ? 'gold-btn' : 'ghost-btn', style: { flex: 1, fontSize: '.78rem', padding: '7px 6px' } }, 'Surcoinché ×4')
+      )
+    ),
+    e('div', { style: { marginBottom: 14 } },
+      e('label', { style: fieldLabelStyle }, 'Belote / Rebelote'),
+      e('div', { style: { display: 'flex', gap: 8 } },
+        e('button', { type: 'button', onClick: () => patch({ belote: 'none' }), className: round.belote === 'none' ? 'gold-btn' : 'ghost-btn', style: { flex: 1, fontSize: '.78rem' } }, 'Aucune'),
+        e('button', { type: 'button', onClick: () => patch({ belote: 'A' }), className: round.belote === 'A' ? 'gold-btn' : 'ghost-btn', style: { flex: 1, fontSize: '.78rem' } }, teamLabel('A')),
+        e('button', { type: 'button', onClick: () => patch({ belote: 'B' }), className: round.belote === 'B' ? 'gold-btn' : 'ghost-btn', style: { flex: 1, fontSize: '.78rem' } }, teamLabel('B'))
+      )
+    ),
+    e('p', { style: { fontFamily: "'Lato',sans-serif", fontSize: '.75rem', color: success ? '#4ade80' : '#f87171', marginBottom: 10 } },
+      success ? '✓ Contrat réalisé — ' : '✗ Contrat chuté — ', teamLabel('A') + ' : ', e(ScoreVal, { v: res.A }), '   ', teamLabel('B') + ' : ', e(ScoreVal, { v: res.B })
+    ),
+    e(GoldBtn, { onClick: onSubmit, style: { width: '100%' } }, submitLabel)
+  );
+}
+
+function BeloteHistoryTable({ rounds, teamA, teamB, onEdit }) {
+  function teamLabel(t) { return (t === 'A' ? teamA : teamB).join(' & '); }
+  function total(team) { return rounds.reduce((sum, r) => sum + calcBeloteDelta(r, team), 0); }
+  return e('div', { style: { overflowX: 'auto', padding: 12, marginTop: 8, borderRadius: 10, background: 'rgba(5,16,32,.88)', border: '1px solid rgba(201,168,76,.28)' } },
+    e('table', { style: { width: '100%', borderCollapse: 'collapse', fontFamily: "'Lato',sans-serif", fontSize: '.75rem' } },
+      e('thead', null,
+        e('tr', null,
+          e('th', { style: { color: '#4a3f2a', textAlign: 'left', padding: '4px 6px', borderBottom: '1px solid rgba(201,168,76,.2)' } }, 'M.'),
+          e('th', { style: { color: '#4a3f2a', textAlign: 'left', padding: '4px 6px', borderBottom: '1px solid rgba(201,168,76,.2)' } }, 'Preneur'),
+          e('th', { style: { color: SEA_COLORS[0], padding: '4px 5px', borderBottom: '1px solid rgba(201,168,76,.2)', textAlign: 'center' } }, teamLabel('A')),
+          e('th', { style: { color: SEA_COLORS[1], padding: '4px 5px', borderBottom: '1px solid rgba(201,168,76,.2)', textAlign: 'center' } }, teamLabel('B')),
+          e('th', { style: { borderBottom: '1px solid rgba(201,168,76,.2)', width: 30 } })
+        )
+      ),
+      e('tbody', null,
+        rounds.map((r, ri) => {
+          const scores = calcBeloteRoundScores(r);
+          const coincheLabel = r.coinche === 'coinche' ? ', coinché' : r.coinche === 'surcoinche' ? ', surcoinché' : '';
+          return e('tr', { key: ri, style: { borderBottom: '1px solid rgba(201,168,76,.07)' } },
+            e('td', { style: { padding: '4px 6px', color: '#c9a84c', fontWeight: 700 } }, ri + 1),
+            e('td', { style: { padding: '4px 6px', color: '#8a7a5a' } }, teamLabel(r.team) + ' (' + r.contract + coincheLabel + ')'),
+            e('td', { style: { padding: '4px 5px', textAlign: 'center' } }, e(ScoreVal, { v: scores.A })),
+            e('td', { style: { padding: '4px 5px', textAlign: 'center' } }, e(ScoreVal, { v: scores.B })),
+            e('td', { style: { padding: '4px 5px' } },
+              e('button', { onClick: () => onEdit(ri), style: { background: 'transparent', border: '1px solid rgba(201,168,76,.35)', color: '#c9a84c', borderRadius: 6, padding: '1px 5px', cursor: 'pointer', fontSize: '.68rem', fontFamily: "'Cinzel',serif" } }, '✏️')
+            )
+          );
+        }),
+        rounds.length > 0 && e('tr', { key: 'total', style: { borderTop: '2px solid rgba(201,168,76,.3)' } },
+          e('td', { style: { padding: '4px 6px', color: '#8a7a5a', fontSize: '.7rem', fontFamily: "'Cinzel',serif" } }, 'TOTAL'),
+          e('td'),
+          e('td', { style: { padding: '4px 5px', textAlign: 'center' } }, e(ScoreVal, { v: total('A') })),
+          e('td', { style: { padding: '4px 5px', textAlign: 'center' } }, e(ScoreVal, { v: total('B') })),
+          e('td')
+        )
+      )
+    )
+  );
+}
+
+function BeloteGame({ onExit }) {
+  const saved = loadJSON(STORAGE_KEY_BELOTE, null);
+  const [phase, setPhase] = useState(saved && saved.phase || 'setup');
+  const [teamA, setTeamA] = useState(saved && saved.teamA || ['', '']);
+  const [teamB, setTeamB] = useState(saved && saved.teamB || ['', '']);
+  const [target, setTarget] = useState(saved && saved.target !== undefined ? saved.target : 1000);
+  const [unlimited, setUnlimited] = useState(saved ? !!saved.unlimited : false);
+  const [rounds, setRounds] = useState(saved && saved.rounds || []);
+  const [round, setRound] = useState(emptyBeloteRound());
+  const [editingPast, setEditingPast] = useState(null);
+  const [pastRound, setPastRound] = useState(null);
+  const [showHistory, setShowHistory] = useState(true);
+  const [knownPlayers, rememberPlayers] = useKnownPlayers();
+
+  useEffect(() => { saveJSON(STORAGE_KEY_BELOTE, { phase, teamA, teamB, target, unlimited, rounds }); }, [phase, teamA, teamB, target, unlimited, rounds]);
+
+  function totalTeam(team) { return rounds.reduce((sum, r) => sum + calcBeloteDelta(r, team), 0); }
+
+  function startGame() {
+    if (teamA.some(n => !n.trim()) || teamB.some(n => !n.trim())) return;
+    rememberPlayers(teamA.concat(teamB));
+    setRounds([]);
+    setRound(emptyBeloteRound());
+    setPhase('playing');
+  }
+
+  function submitRound() {
+    const newRounds = rounds.concat([round]);
+    setRounds(newRounds);
+    setRound(emptyBeloteRound());
+    if (!unlimited) {
+      const ta = newRounds.reduce((s, r) => s + calcBeloteDelta(r, 'A'), 0);
+      const tb = newRounds.reduce((s, r) => s + calcBeloteDelta(r, 'B'), 0);
+      if (ta >= target || tb >= target) setPhase('results');
+    }
+  }
+
+  function openPastEdit(ri) { setEditingPast(ri); setPastRound(Object.assign({}, rounds[ri])); }
+  function savePastEdit() {
+    setRounds(rs => rs.map((r, ri) => ri === editingPast ? pastRound : r));
+    setEditingPast(null);
+  }
+
+  function endGame() { setPhase('results'); }
+
+  function restartGame() {
+    setPhase('setup'); setTeamA(['', '']); setTeamB(['', '']); setRounds([]); setRound(emptyBeloteRound());
+    localStorage.removeItem(STORAGE_KEY_BELOTE);
+  }
+
+  function teamLabel(t) { return (t === 'A' ? teamA : teamB).join(' & '); }
+  const scoreA = totalTeam('A'), scoreB = totalTeam('B');
+  const sortedResults = [
+    { name: teamLabel('A'), score: scoreA, color: SEA_COLORS[0] },
+    { name: teamLabel('B'), score: scoreB, color: SEA_COLORS[1] }
+  ].sort((a, b) => b.score - a.score);
+
+  return e('div', { style: { minHeight: '100vh', background: 'radial-gradient(ellipse at 60% 0%,#0d2137 0%,#051020 60%,#000 100%)', position: 'relative', overflow: 'hidden' } },
+    e('div', { className: 'sk-skull' }, '♠️'),
+    e('div', { className: 'sk-wave' }),
+    e('div', { className: 'sk-wave sk-wave2' }),
+    e('div', { style: { position: 'relative', zIndex: 1, maxWidth: 700, margin: '0 auto', padding: '20px 13px 90px' } },
+      e(GameHeader, { onExit, icon: '♠️', title: 'BELOTE COINCHÉE' }),
+
+      phase === 'setup' && e('div', { className: 'sk-card', style: { padding: 24 } },
+        e('h2', { style: { margin: '0 0 15px', fontSize: '1rem', color: '#c9a84c', letterSpacing: '.1em' } }, 'Équipes'),
+        e('datalist', { id: 'known-players-list' }, knownPlayers.map(kp => e('option', { key: kp, value: kp }))),
+        e('div', { style: { marginBottom: 18 } },
+          e('p', { style: Object.assign({}, fieldLabelStyle, { color: SEA_COLORS[0], marginBottom: 8 }) }, 'Équipe A'),
+          [0, 1].map(i => e('input', { key: i, className: 'text-input', style: { marginBottom: 8, width: '100%', boxSizing: 'border-box' }, placeholder: 'Joueur ' + (i + 1), value: teamA[i], list: 'known-players-list', onChange: ev => setTeamA(t => t.map((v, idx) => idx === i ? ev.target.value : v)) }))
+        ),
+        e('div', { style: { marginBottom: 18 } },
+          e('p', { style: Object.assign({}, fieldLabelStyle, { color: SEA_COLORS[1], marginBottom: 8 }) }, 'Équipe B'),
+          [0, 1].map(i => e('input', { key: i, className: 'text-input', style: { marginBottom: 8, width: '100%', boxSizing: 'border-box' }, placeholder: 'Joueur ' + (i + 1), value: teamB[i], list: 'known-players-list', onChange: ev => setTeamB(t => t.map((v, idx) => idx === i ? ev.target.value : v)) }))
+        ),
+        e('div', { style: { marginBottom: 18 } },
+          e('label', { style: { display: 'flex', alignItems: 'center', gap: 8, fontFamily: "'Lato',sans-serif", fontSize: '.82rem', color: '#8a7a5a' } },
+            e('input', { type: 'checkbox', checked: unlimited, onChange: ev => setUnlimited(ev.target.checked) }),
+            'Partie sans score cible (fin manuelle)'
+          ),
+          !unlimited && e('div', { style: { marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 } },
+            e('span', { style: { fontFamily: "'Lato',sans-serif", fontSize: '.82rem', color: '#8a7a5a' } }, 'Score cible :'),
+            e('input', { type: 'number', className: 'num-input', style: { width: 80 }, min: 100, step: 100, value: target, onChange: ev => setTarget(Math.max(100, parseInt(ev.target.value) || 1000)) })
+          )
+        ),
+        e(GoldBtn, { onClick: startGame, disabled: teamA.some(n => !n.trim()) || teamB.some(n => !n.trim()), style: { width: '100%', fontSize: '1rem', padding: 13 } }, '♠️ Commencer la partie')
+      ),
+
+      phase === 'playing' && e('div', null,
+        e('div', { className: 'sk-card', style: { padding: 16, marginBottom: 11 } },
+          e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+            e('div', null,
+              e('p', { style: { margin: 0, fontFamily: "'Lato',sans-serif", color: '#8a7a5a', fontSize: '.7rem', letterSpacing: '.15em' } }, 'MANCHE'),
+              e('p', { style: { margin: 0, fontSize: '1.6rem', fontWeight: 900, color: '#c9a84c', lineHeight: 1 } }, rounds.length + 1)
+            ),
+            e('div', { style: { textAlign: 'right', fontFamily: "'Lato',sans-serif", fontSize: '.78rem', color: '#8a7a5a' } },
+              e('div', null, teamLabel('A') + ' : ', e(ScoreVal, { v: scoreA }), !unlimited ? ' / ' + target : ''),
+              e('div', null, teamLabel('B') + ' : ', e(ScoreVal, { v: scoreB }), !unlimited ? ' / ' + target : '')
+            )
+          ),
+          e('div', { style: { textAlign: 'center', marginTop: 8 } },
+            e('span', { onClick: () => { if (window.confirm('Abandonner la partie en cours ?')) restartGame(); }, style: { fontFamily: "'Lato',sans-serif", fontSize: '.7rem', color: '#4a3f2a', cursor: 'pointer', textDecoration: 'underline' } }, 'Abandonner la partie')
+          )
+        ),
+        e(BeloteRoundForm, { teamA, teamB, round, setRound, onSubmit: submitRound, submitLabel: 'Valider la manche →' }),
+        rounds.length > 0 && e(GoldBtn, { onClick: endGame, style: { width: '100%', marginBottom: 4 } }, '🏁 Terminer la partie'),
+        e('div', { style: { marginTop: 18 } },
+          e(HistoryToggle, { showHistory, setShowHistory, label: '📊 Scores & historique' + (rounds.length > 0 ? ' (' + rounds.length + ' manche' + (rounds.length > 1 ? 's' : '') + ')' : '') }),
+          showHistory && rounds.length > 0 && e(BeloteHistoryTable, { rounds, teamA, teamB, onEdit: openPastEdit }),
+          showHistory && rounds.length === 0 && e('p', { style: { textAlign: 'center', color: '#4a3f2a', fontFamily: "'Lato',sans-serif", fontSize: '.8rem', padding: '10px 0' } }, 'Aucune manche terminée pour l\'instant.')
+        )
+      ),
+
+      phase === 'results' && e('div', null,
+        e('div', { className: 'sk-card', style: { padding: 24, textAlign: 'center', marginBottom: 14 } },
+          e('div', { style: { fontSize: '2.6rem', marginBottom: 6 } }, '🏆'),
+          e('h2', { style: { margin: '0 0 3px', color: '#c9a84c', fontSize: '1.4rem' } }, 'Fin de partie !'),
+          e('p', { style: { margin: 0, fontFamily: "'Lato',sans-serif", color: '#8a7a5a' } }, 'Résultats après ' + rounds.length + ' manche' + (rounds.length > 1 ? 's' : ''))
+        ),
+        e(ResultsPodium, { sortedResults }),
+        e('div', { style: { marginTop: 16 } },
+          e(HistoryToggle, { showHistory, setShowHistory, label: '📋 Détail manche par manche' }),
+          showHistory && e(BeloteHistoryTable, { rounds, teamA, teamB, onEdit: openPastEdit })
+        ),
+        e(GoldBtn, { onClick: restartGame, style: { width: '100%', marginTop: 16, fontSize: '1rem', padding: 14 } }, '♠️ Nouvelle partie')
+      )
+    ),
+
+    editingPast !== null && e('div', { className: 'sk-overlay', onClick: () => setEditingPast(null) },
+      e('div', { className: 'sk-modal', onClick: ev => ev.stopPropagation() },
+        e('h3', { style: { margin: '0 0 13px', color: '#c9a84c' } }, 'Modifier — Manche ' + (editingPast + 1)),
+        pastRound && e(BeloteRoundForm, { teamA, teamB, round: pastRound, setRound: setPastRound, onSubmit: savePastEdit, submitLabel: '💾 Sauvegarder' }),
+        e(GhostBtn, { onClick: () => setEditingPast(null), style: { width: '100%', marginTop: 8 } }, 'Annuler')
+      )
+    )
+  );
+}
+
+// ── Jeu : Autre (tableau libre) ─────────────────────────────────────────────────
+const STORAGE_KEY_FREESCORE = 'freescore_current_game';
+
+function emptyFreeRound(playerCount) { return Array.from({ length: playerCount }, () => 0); }
+
+function FreeScoreTable({ players, rounds, editable, onUpdateCell, onRemoveRound }) {
+  function total(pi) { return rounds.reduce((sum, r) => sum + (parseFloat(r[pi]) || 0), 0); }
+  return e('div', { style: { overflowX: 'auto', padding: 12, marginTop: 8, borderRadius: 10, background: 'rgba(5,16,32,.88)', border: '1px solid rgba(201,168,76,.28)' } },
+    e('table', { style: { width: '100%', borderCollapse: 'collapse', fontFamily: "'Lato',sans-serif", fontSize: '.8rem' } },
+      e('thead', null,
+        e('tr', null,
+          e('th', { style: { color: '#4a3f2a', textAlign: 'left', padding: '4px 6px', borderBottom: '1px solid rgba(201,168,76,.2)' } }, 'M.'),
+          players.map((p, i) => e('th', { key: i, style: { color: SEA_COLORS[i % SEA_COLORS.length], padding: '4px 5px', borderBottom: '1px solid rgba(201,168,76,.2)', textAlign: 'center' } }, p)),
+          editable && e('th', { style: { borderBottom: '1px solid rgba(201,168,76,.2)', width: 26 } })
+        )
+      ),
+      e('tbody', null,
+        rounds.map((r, ri) => e('tr', { key: ri, style: { borderBottom: '1px solid rgba(201,168,76,.07)' } },
+          e('td', { style: { padding: '4px 6px', color: '#c9a84c', fontWeight: 700 } }, ri + 1),
+          r.map((val, pi) => e('td', { key: pi, style: { padding: '3px 5px', textAlign: 'center' } },
+            editable
+              ? e('input', { type: 'number', className: 'num-input', style: { width: 56 }, value: val === 0 ? '' : val, placeholder: '0', onChange: ev => onUpdateCell(ri, pi, ev.target.value === '' ? 0 : (parseFloat(ev.target.value) || 0)) })
+              : e(ScoreVal, { v: val })
+          )),
+          editable && e('td', { style: { padding: '4px 5px' } },
+            e('button', { onClick: () => onRemoveRound(ri), style: { background: 'transparent', border: '1px solid rgba(248,113,113,.35)', color: '#f87171', borderRadius: 6, padding: '1px 5px', cursor: 'pointer', fontSize: '.68rem' } }, '×')
+          )
+        )),
+        rounds.length > 0 && e('tr', { key: 'total', style: { borderTop: '2px solid rgba(201,168,76,.3)' } },
+          e('td', { style: { padding: '4px 6px', color: '#8a7a5a', fontSize: '.7rem', fontFamily: "'Cinzel',serif" } }, 'TOTAL'),
+          players.map((_, pi) => e('td', { key: pi, style: { padding: '4px 5px', textAlign: 'center' } }, e(ScoreVal, { v: total(pi) }))),
+          editable && e('td')
+        )
+      )
+    )
+  );
+}
+
+function FreeScoreGame({ onExit }) {
+  const saved = loadJSON(STORAGE_KEY_FREESCORE, null);
+  const [phase, setPhase] = useState(saved && saved.phase || 'setup');
+  const [players, setPlayers] = useState(saved && saved.players || []);
+  const [highWins, setHighWins] = useState(saved && saved.highWins !== undefined ? saved.highWins : true);
+  const [rounds, setRounds] = useState(saved && saved.rounds || []);
+  const [knownPlayers, rememberPlayers] = useKnownPlayers();
+
+  useEffect(() => { saveJSON(STORAGE_KEY_FREESCORE, { phase, players, highWins, rounds }); }, [phase, players, highWins, rounds]);
+
+  function totalFor(pi) { return rounds.reduce((sum, r) => sum + (parseFloat(r[pi]) || 0), 0); }
+
+  function startGame() {
+    if (players.length < 2) return;
+    rememberPlayers(players);
+    setRounds([]);
+    setPhase('playing');
+  }
+
+  function addRound() { setRounds(rs => rs.concat([emptyFreeRound(players.length)])); }
+  function updateCell(ri, pi, val) { setRounds(rs => rs.map((r, i) => i === ri ? r.map((v, j) => j === pi ? val : v) : r)); }
+  function removeRound(ri) { setRounds(rs => rs.filter((_, i) => i !== ri)); }
+
+  function endGame() { setPhase('results'); }
+  function restartGame() {
+    setPhase('setup'); setPlayers([]); setRounds([]);
+    localStorage.removeItem(STORAGE_KEY_FREESCORE);
+  }
+
+  const sortedResults = players.map((name, i) => ({ name, score: totalFor(i), color: SEA_COLORS[i % SEA_COLORS.length] }))
+    .sort((a, b) => highWins ? b.score - a.score : a.score - b.score);
+
+  return e('div', { style: { minHeight: '100vh', background: 'radial-gradient(ellipse at 60% 0%,#0d2137 0%,#051020 60%,#000 100%)', position: 'relative', overflow: 'hidden' } },
+    e('div', { className: 'sk-skull' }, '📝'),
+    e('div', { className: 'sk-wave' }),
+    e('div', { className: 'sk-wave sk-wave2' }),
+    e('div', { style: { position: 'relative', zIndex: 1, maxWidth: 700, margin: '0 auto', padding: '20px 13px 90px' } },
+      e(GameHeader, { onExit, icon: '📝', title: 'AUTRE' }),
+
+      phase === 'setup' && e('div', { className: 'sk-card', style: { padding: 24 } },
+        e('h2', { style: { margin: '0 0 15px', fontSize: '1rem', color: '#c9a84c', letterSpacing: '.1em' } }, 'Joueurs (' + players.length + '/10)'),
+        e(PlayerPicker, { players, setPlayers, min: 2, max: 10, knownPlayers, remember: rememberPlayers }),
+        e('div', { style: { marginBottom: 20 } },
+          e('p', { style: fieldLabelStyle }, 'Qui gagne ?'),
+          e('div', { style: { display: 'flex', gap: 8 } },
+            e('button', { type: 'button', onClick: () => setHighWins(true), className: highWins ? 'gold-btn' : 'ghost-btn', style: { flex: 1, fontSize: '.82rem' } }, 'Score le + haut'),
+            e('button', { type: 'button', onClick: () => setHighWins(false), className: !highWins ? 'gold-btn' : 'ghost-btn', style: { flex: 1, fontSize: '.82rem' } }, 'Score le + bas')
+          )
+        ),
+        e(GoldBtn, { onClick: startGame, disabled: players.length < 2, style: { width: '100%', fontSize: '1rem', padding: 13 } }, '📝 Commencer la partie')
+      ),
+
+      phase === 'playing' && e('div', null,
+        e('div', { className: 'sk-card', style: { padding: 16, marginBottom: 11 } },
+          e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+            e('p', { style: { margin: 0, fontFamily: "'Lato',sans-serif", color: '#8a7a5a', fontSize: '.82rem' } }, rounds.length + ' manche' + (rounds.length !== 1 ? 's' : '') + ' jouée' + (rounds.length !== 1 ? 's' : '')),
+            e('span', { onClick: () => { if (window.confirm('Abandonner la partie en cours ?')) restartGame(); }, style: { fontFamily: "'Lato',sans-serif", fontSize: '.7rem', color: '#4a3f2a', cursor: 'pointer', textDecoration: 'underline' } }, 'Abandonner la partie')
+          )
+        ),
+        e(FreeScoreTable, { players, rounds, editable: true, onUpdateCell: updateCell, onRemoveRound: removeRound }),
+        e('div', { style: { display: 'flex', gap: 9, marginTop: 11 } },
+          e(GhostBtn, { onClick: addRound, style: { flex: 1 } }, '+ Manche'),
+          e(GoldBtn, { onClick: endGame, disabled: rounds.length === 0, style: { flex: 1 } }, '🏁 Terminer la partie')
+        )
+      ),
+
+      phase === 'results' && e('div', null,
+        e('div', { className: 'sk-card', style: { padding: 24, textAlign: 'center', marginBottom: 14 } },
+          e('div', { style: { fontSize: '2.6rem', marginBottom: 6 } }, '🏆'),
+          e('h2', { style: { margin: '0 0 3px', color: '#c9a84c', fontSize: '1.4rem' } }, 'Fin de partie !'),
+          e('p', { style: { margin: 0, fontFamily: "'Lato',sans-serif", color: '#8a7a5a' } }, 'Résultats après ' + rounds.length + ' manche' + (rounds.length > 1 ? 's' : ''))
+        ),
+        e(ResultsPodium, { sortedResults }),
+        e('div', { style: { marginTop: 16 } },
+          e(FreeScoreTable, { players, rounds, editable: false })
+        ),
+        e(GoldBtn, { onClick: restartGame, style: { width: '100%', marginTop: 16, fontSize: '1rem', padding: 14 } }, '📝 Nouvelle partie')
+      )
+    )
+  );
+}
+
 // ── Registre des jeux ─────────────────────────────────────────────────────────
 const GAMES = [
   { id: 'skullking', name: 'Skull King', icon: '💀', tagline: 'Annonces, plis & bonus de capture', accent: '#c9a84c', storageKey: STORAGE_KEY_GAME, Component: SkullKingGame },
+  { id: 'tarot', name: 'Tarot', icon: '🔮', tagline: 'Preneur, contrat & bouts (3 à 5 joueurs)', accent: '#8b6914', storageKey: STORAGE_KEY_TAROT, Component: TarotGame },
+  { id: 'belote', name: 'Belote coinchée', icon: '♠️', tagline: 'Équipes, contrats & coinche', accent: '#457b9d', storageKey: STORAGE_KEY_BELOTE, Component: BeloteGame },
+  { id: 'freescore', name: 'Autre', icon: '📝', tagline: 'Tableau de scores libre', accent: '#6a4c93', storageKey: STORAGE_KEY_FREESCORE, Component: FreeScoreGame },
 ];
 
 function isGameInProgress(game) {
