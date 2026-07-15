@@ -38,6 +38,12 @@ body{-webkit-tap-highlight-color:transparent;}
 .ref-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(201,168,76,.07);font-family:'Lato',sans-serif;font-size:.8rem}
 .ref-row:last-child{border-bottom:none}
 .ref-cat{color:#8a7a5a;font-size:.7rem;letter-spacing:.1em;margin:10px 0 4px;font-family:'Cinzel',serif}
+.game-tile{cursor:pointer;transition:all .2s}
+.game-tile:hover{transform:translateY(-2px);border-color:rgba(201,168,76,.6)}
+.game-tile:active{transform:translateY(0)}
+.badge-live{display:inline-flex;align-items:center;gap:5px;font-family:'Lato',sans-serif;font-size:.68rem;color:#4ade80;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.3);border-radius:20px;padding:2px 9px}
+.badge-dot{width:6px;height:6px;border-radius:50%;background:#4ade80;animation:sk-pulse 1.5s ease-in-out infinite}
+@keyframes sk-pulse{0%,100%{opacity:1}50%{opacity:.3}}
 </style>
 </head>
 <body>
@@ -225,8 +231,8 @@ function HistoryTable({ rounds, players, onEdit }) {
   );
 }
 
-// ── Composant principal ───────────────────────────────────────────────────────
-function SkullKing() {
+// ── Jeu : Skull King ──────────────────────────────────────────────────────────
+function SkullKingGame({ onExit }) {
   const saved = loadJSON(STORAGE_KEY_GAME, null);
 
   const [players, setPlayers]               = useState(saved && saved.players || []);
@@ -364,7 +370,8 @@ function SkullKing() {
     e('div', { style: { position: 'relative', zIndex: 1, maxWidth: 700, margin: '0 auto', padding: '20px 13px 90px' } },
 
       // Header
-      e('div', { style: { textAlign: 'center', marginBottom: 24 } },
+      e('div', { style: { textAlign: 'center', marginBottom: 24, position: 'relative' } },
+        e(GhostBtn, { onClick: onExit, style: { position: 'absolute', left: 0, top: 4, fontSize: '.72rem', padding: '5px 10px' } }, '← Jeux'),
         e('div', { style: { fontSize: '2.2rem', marginBottom: 2 } }, '💀'),
         e('h1', { style: { margin: 0, fontSize: '1.85rem', fontWeight: 900, letterSpacing: '.08em', color: '#c9a84c', textShadow: '0 0 28px rgba(201,168,76,.5)' } }, 'SKULL KING'),
         e('p', { style: { margin: '3px 0 0', fontFamily: "'Lato',sans-serif", color: '#8a7a5a', fontSize: '.75rem', letterSpacing: '.22em' } }, 'COMPTEUR DE POINTS')
@@ -557,7 +564,62 @@ function SkullKing() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(SkullKing));
+// ── Registre des jeux ─────────────────────────────────────────────────────────
+const GAMES = [
+  { id: 'skullking', name: 'Skull King', icon: '💀', tagline: 'Annonces, plis & bonus de capture', accent: '#c9a84c', storageKey: STORAGE_KEY_GAME, Component: SkullKingGame },
+];
+
+function isGameInProgress(game) {
+  const saved = loadJSON(game.storageKey, null);
+  return !!(saved && saved.phase === 'playing');
+}
+
+// ── Accueil ───────────────────────────────────────────────────────────────────
+function Home({ onSelect }) {
+  return e('div', { style: { minHeight: '100vh', background: 'radial-gradient(ellipse at 60% 0%,#0d2137 0%,#051020 60%,#000 100%)', position: 'relative', overflow: 'hidden' } },
+    e('div', { className: 'sk-skull' }, '🎲'),
+    e('div', { className: 'sk-wave' }),
+    e('div', { className: 'sk-wave sk-wave2' }),
+    e('div', { style: { position: 'relative', zIndex: 1, maxWidth: 700, margin: '0 auto', padding: '30px 13px 90px' } },
+      e('div', { style: { textAlign: 'center', marginBottom: 28 } },
+        e('div', { style: { fontSize: '2.2rem', marginBottom: 2 } }, '🎲'),
+        e('h1', { style: { margin: 0, fontSize: '1.85rem', fontWeight: 900, letterSpacing: '.08em', color: '#c9a84c', textShadow: '0 0 28px rgba(201,168,76,.5)' } }, 'COMPTEUR DE POINTS'),
+        e('p', { style: { margin: '3px 0 0', fontFamily: "'Lato',sans-serif", color: '#8a7a5a', fontSize: '.75rem', letterSpacing: '.22em' } }, 'CHOISISSEZ UN JEU')
+      ),
+      e('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 12 } },
+        GAMES.map(game => {
+          const inProgress = isGameInProgress(game);
+          return e('div', {
+            key: game.id,
+            className: 'sk-card game-tile',
+            style: { padding: 18, borderLeft: '3px solid ' + game.accent },
+            onClick: () => onSelect(game.id)
+          },
+            e('div', { style: { fontSize: '1.8rem', marginBottom: 8 } }, game.icon),
+            e('div', { style: { fontWeight: 700, fontFamily: "'Cinzel',serif", color: '#e8d5b0', fontSize: '1.05rem', marginBottom: 3 } }, game.name),
+            e('div', { style: { fontFamily: "'Lato',sans-serif", fontSize: '.78rem', color: '#8a7a5a', marginBottom: inProgress ? 10 : 0 } }, game.tagline),
+            inProgress && e('span', { className: 'badge-live' }, e('span', { className: 'badge-dot' }), 'Partie en cours')
+          );
+        })
+      )
+    )
+  );
+}
+
+// ── App ───────────────────────────────────────────────────────────────────────
+const STORAGE_KEY_ACTIVE_GAME = 'games_active_game_id';
+
+function App() {
+  const [activeGame, setActiveGame] = useState(() => loadJSON(STORAGE_KEY_ACTIVE_GAME, null));
+
+  useEffect(() => { saveJSON(STORAGE_KEY_ACTIVE_GAME, activeGame); }, [activeGame]);
+
+  const game = GAMES.find(g => g.id === activeGame);
+  if (!game) return e(Home, { onSelect: setActiveGame });
+  return e(game.Component, { onExit: () => setActiveGame(null) });
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
 </script>
 </body>
 </html>
