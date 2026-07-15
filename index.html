@@ -1318,6 +1318,16 @@ function Home({ onSelect }) {
             inProgress && e('span', { className: 'badge-live' }, e('span', { className: 'badge-dot' }), 'Partie en cours')
           );
         })
+      ),
+      e('div', { className: 'sk-card', style: { padding: 20, marginTop: 26, textAlign: 'center' } },
+        e('p', { style: { margin: '0 0 12px', fontFamily: "'Lato',sans-serif", fontSize: '.8rem', color: '#8a7a5a', lineHeight: 1.5 } },
+          'Un bug à signaler ou une idée d\'amélioration ? Cliquez ci-dessous pour nous l\'envoyer par email.'
+        ),
+        e('a', {
+          href: 'mailto:val.croissy@gmail.com?subject=' + encodeURIComponent('[Webapp point scorer] Suggestion amélioration'),
+          className: 'gold-btn',
+          style: { display: 'inline-block', textDecoration: 'none' }
+        }, '💡 Suggestion')
       )
     )
   );
